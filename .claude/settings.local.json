@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(flutter analyze lib 2>&1)",
+      "PowerShell(flutter devices 2>&1)",
+      "Bash(flutter build *)",
+      "Bash(/c/Users/Lenovo/AppData/Local/Android/Sdk/platform-tools/adb.exe -s RR8W801G2CZ exec-out screencap -p)",
+      "Read(//tmp/**)",
+      "Bash(/c/Users/Lenovo/AppData/Local/Android/Sdk/platform-tools/adb.exe -s RR8W801G2CZ shell which sqlite3)",
+      "Bash(/c/Users/Lenovo/AppData/Local/Android/Sdk/platform-tools/adb.exe -s RR8W801G2CZ shell run-as com.example.accesra ls -la databases)",
+      "Bash(/c/Users/Lenovo/AppData/Local/Android/Sdk/platform-tools/adb.exe devices *)",
+      "Bash(/c/Users/Lenovo/AppData/Local/Android/Sdk/platform-tools/adb.exe wait-for-device *)"
+    ]
+  }
+}
