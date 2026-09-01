@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
-import '../../../../core/theme/theme_extensions.dart';
+import 'package:flutter/material.dart'; // Widget-widget dasar Flutter (Material Design)
+import '../../../../core/theme/theme_extensions.dart'; // Extension untuk akses warna sesuai tema
 
 /// ─────────────────────────────────────────────────────────────────
 /// VOICE INPUT BAR  –  Bar input teks + tombol suara untuk chat AI
@@ -12,99 +12,99 @@ import '../../../../core/theme/theme_extensions.dart';
 ///   )
 /// ─────────────────────────────────────────────────────────────────
 
-class VoiceInputBar extends StatelessWidget {
-  final TextEditingController controller;
+class VoiceInputBar extends StatelessWidget { // Widget bar input, tanpa state internal
+  final TextEditingController controller; // Pengendali teks kolom input
 
   /// Callback saat tombol kirim ditekan (menerima teks)
-  final ValueChanged<String> onSend;
+  final ValueChanged<String> onSend; // Fungsi dipanggil saat mengirim pesan
 
   /// Callback saat tombol mikrofon ditekan
-  final VoidCallback onVoice;
+  final VoidCallback onVoice; // Fungsi dipanggil saat tombol mic ditekan
 
-  const VoiceInputBar({
-    super.key,
-    required this.controller,
-    required this.onSend,
-    required this.onVoice,
+  const VoiceInputBar({ // Konstruktor widget
+    super.key, // Key diteruskan ke superclass
+    required this.controller, // Wajib diisi
+    required this.onSend, // Wajib diisi
+    required this.onVoice, // Wajib diisi
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.only(
+  Widget build(BuildContext context) { // Membangun tampilan bar input
+    return Container( // Kotak pembungkus seluruh bar
+      padding: EdgeInsets.only( // Jarak isi dari tepi kotak
         left: 16,
         right: 16,
         top: 12,
-        bottom: 12 + MediaQuery.of(context).viewInsets.bottom,
+        bottom: 12 + MediaQuery.of(context).viewInsets.bottom, // Tambah jarak bawah saat keyboard muncul
       ),
-      decoration: BoxDecoration(
-        color: context.warnaKartu,
-        border: Border(
+      decoration: BoxDecoration( // Dekorasi visual bar
+        color: context.warnaKartu, // Warna latar bar
+        border: Border( // Garis tepi hanya di bagian atas
           top: BorderSide(color: context.warnaGaris),
         ),
       ),
-      child: Row(
+      child: Row( // Susun kolom teks dan tombol-tombol secara horizontal
         children: [
           // ── Field teks ─────────────────────────────────────────
-          Expanded(
-            child: TextField(
-              controller: controller,
-              style: TextStyle(color: context.warnaTeksUtama),
-              decoration: InputDecoration(
-                hintText: 'Tanya seputar keuangan Anda...',
+          Expanded( // Kolom teks mengisi sisa ruang yang tersedia
+            child: TextField( // Kolom input teks untuk mengetik pesan
+              controller: controller, // Hubungkan ke pengendali teks
+              style: TextStyle(color: context.warnaTeksUtama), // Warna teks yang diketik
+              decoration: InputDecoration( // Dekorasi visual kolom input
+                hintText: 'Tanya seputar keuangan Anda...', // Teks petunjuk saat kolom kosong
                 hintStyle: TextStyle(
                   fontSize: 14,
                   color: context.warnaTeksMuted,
                 ),
-                filled: true,
-                fillColor: context.warnaKartuMenonjol,
-                contentPadding: const EdgeInsets.symmetric(
+                filled: true, // Aktifkan warna latar kolom
+                fillColor: context.warnaKartuMenonjol, // Warna latar kolom input
+                contentPadding: const EdgeInsets.symmetric( // Jarak isi teks dari tepi kolom
                   horizontal: 16,
                   vertical: 10,
                 ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide.none,
+                border: OutlineInputBorder( // Bentuk garis tepi kolom
+                  borderRadius: BorderRadius.circular(24), // Sudut sangat membulat
+                  borderSide: BorderSide.none, // Tanpa garis tepi terlihat
                 ),
               ),
-              onSubmitted: onSend,
+              onSubmitted: onSend, // Kirim pesan saat menekan enter/submit
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 8), // Jarak horizontal kolom teks ke tombol mic
 
           // ── Tombol Suara ─────────────────────────────────────
-          GestureDetector(
-            onTap: onVoice,
-            child: Container(
+          GestureDetector( // Deteksi ketukan pada tombol mic
+            onTap: onVoice, // Panggil callback suara saat ditekan
+            child: Container( // Lingkaran tombol mic
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: context.latarMasuk,
-                shape: BoxShape.circle,
+                color: context.latarMasuk, // Warna latar tombol
+                shape: BoxShape.circle, // Bentuk lingkaran
               ),
-              child: Icon(
+              child: Icon( // Ikon mikrofon
                 Icons.mic_outlined,
                 size: 22,
                 color: context.warnaMasuk,
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 8), // Jarak horizontal tombol mic ke tombol kirim
 
           // ── Tombol Kirim ─────────────────────────────────────
-          GestureDetector(
-            onTap: () => onSend(controller.text),
-            child: Container(
+          GestureDetector( // Deteksi ketukan pada tombol kirim
+            onTap: () => onSend(controller.text), // Kirim isi kolom teks saat ditekan
+            child: Container( // Lingkaran tombol kirim
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
-                shape: BoxShape.circle,
+                color: Theme.of(context).colorScheme.primary, // Warna latar tombol dari tema
+                shape: BoxShape.circle, // Bentuk lingkaran
               ),
-              child: Icon(
+              child: Icon( // Ikon kirim
                 Icons.send_rounded,
                 size: 20,
-                color: Theme.of(context).colorScheme.onPrimary,
+                color: Theme.of(context).colorScheme.onPrimary, // Warna ikon kontras dengan latar
               ),
             ),
           ),

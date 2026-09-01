@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart'; // Widget dasar Flutter
 
-import '../../../../core/theme/app_typography.dart';
-import '../../../../core/theme/theme_extensions.dart';
-import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/theme/app_typography.dart'; // Gaya teks terpusat
+import '../../../../core/theme/theme_extensions.dart'; // Ekstensi warna tema kontekstual
+import '../../../../core/utils/currency_formatter.dart'; // Format nominal ke teks rupiah/terucap
 
 /// ─────────────────────────────────────────────────────────────────
 /// SUMMARY GRID  –  Grid 2×2 ringkasan keuangan hari ini
@@ -20,10 +20,10 @@ import '../../../../core/utils/currency_formatter.dart';
 /// ─────────────────────────────────────────────────────────────────
 
 class SummaryGrid extends StatelessWidget {
-  final int income;
-  final int expense;
-  final int profit;
-  final int transactionCount;
+  final int income; // Total pemasukan hari ini
+  final int expense; // Total pengeluaran hari ini
+  final int profit; // Laba (bisa negatif bila rugi)
+  final int transactionCount; // Jumlah transaksi hari ini
 
   const SummaryGrid({
     super.key,
@@ -35,7 +35,7 @@ class SummaryGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool rugi = profit < 0;
+    final bool rugi = profit < 0; // Tentukan label "Rugi" atau "Laba" dari tanda profit
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -48,11 +48,11 @@ class SummaryGrid extends StatelessWidget {
         ),
         const SizedBox(height: 12),
 
-        Row(
+        Row( // Baris berisi 2 kolom kartu (kiri & kanan)
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: Column(
+              child: Column( // Kolom kiri: Pemasukan + Laba/Rugi
                 children: [
                   _SummaryCard(
                     // north_east/south_west, sama dengan ikon arah di
@@ -60,11 +60,11 @@ class SummaryGrid extends StatelessWidget {
                     // dashboard. Diagonal dipilih di seluruh app
                     // karena panah lurus atas-bawah mudah tertukar
                     // dengan penanda urutan atau gulir.
-                    icon: Icons.north_east,
+                    icon: Icons.north_east, // Panah diagonal naik = pemasukan
                     iconColor: context.warnaMasuk,
                     label: 'Pemasukan',
-                    value: CurrencyFormatter.format(income),
-                    spokenValue: CurrencyFormatter.spoken(income),
+                    value: CurrencyFormatter.format(income), // Teks tampilan angka
+                    spokenValue: CurrencyFormatter.spoken(income), // Teks terucap untuk pembaca layar
                     bgColor: context.latarMasuk,
                     valueColor: context.warnaMasuk,
                   ),
@@ -72,8 +72,8 @@ class SummaryGrid extends StatelessWidget {
                   _SummaryCard(
                     icon: Icons.account_balance_wallet_outlined,
                     iconColor: context.warnaInfo,
-                    label: rugi ? 'Rugi Bersih' : 'Laba Bersih',
-                    value: CurrencyFormatter.format(profit.abs()),
+                    label: rugi ? 'Rugi Bersih' : 'Laba Bersih', // Label berubah sesuai untung/rugi
+                    value: CurrencyFormatter.format(profit.abs()), // Tampilkan nilai mutlak (tanpa minus)
                     spokenValue: CurrencyFormatter.spoken(profit.abs()),
                     bgColor: context.latarInfo,
                     valueColor: context.warnaInfo,
@@ -83,10 +83,10 @@ class SummaryGrid extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Column(
+              child: Column( // Kolom kanan: Pengeluaran + Jumlah transaksi
                 children: [
                   _SummaryCard(
-                    icon: Icons.south_west,
+                    icon: Icons.south_west, // Panah diagonal turun = pengeluaran
                     iconColor: context.warnaKeluar,
                     label: 'Pengeluaran',
                     value: CurrencyFormatter.format(expense),
@@ -99,7 +99,7 @@ class SummaryGrid extends StatelessWidget {
                     icon: Icons.receipt_long_outlined,
                     iconColor: context.warnaAmber,
                     label: 'Transaksi',
-                    value: '$transactionCount',
+                    value: '$transactionCount', // Angka jumlah transaksi langsung sebagai teks
                     spokenValue: '$transactionCount transaksi',
                     bgColor: context.latarAmber,
                     valueColor: context.warnaAmber,
@@ -116,13 +116,13 @@ class SummaryGrid extends StatelessWidget {
 
 /// Kartu ringkasan satu metrik keuangan
 class _SummaryCard extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final String label;
-  final String value;
-  final String spokenValue;
-  final Color bgColor;
-  final Color valueColor;
+  final IconData icon; // Ikon metrik
+  final Color iconColor; // Warna ikon
+  final String label; // Nama metrik, mis. "Pemasukan"
+  final String value; // Nilai tampilan (format angka)
+  final String spokenValue; // Nilai untuk dibacakan pembaca layar
+  final Color bgColor; // Warna latar kartu
+  final Color valueColor; // Warna teks nilai
 
   const _SummaryCard({
     required this.icon,
@@ -137,7 +137,7 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: '$label $spokenValue',
+      label: '$label $spokenValue', // Gabungan label+nilai untuk pembaca layar
       excludeSemantics: true,
       child: Container(
         width: double.infinity,
@@ -148,13 +148,13 @@ class _SummaryCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: valueColor.withValues(alpha: 0.35)),
+          border: Border.all(color: valueColor.withValues(alpha: 0.35)), // Garis tipis transparan sewarna nilai
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Row(
+            Row( // Baris ikon bulat + label metrik
               children: [
                 Container(
                   width: 28,
@@ -178,7 +178,7 @@ class _SummaryCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Text(
+            Text( // Nilai nominal/angka utama kartu
               value,
               style: AppTypography.numericLarge.copyWith(
                 color: valueColor,

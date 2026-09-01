@@ -1,16 +1,16 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
-import 'package:flutter/services.dart';
-import '../../../../core/navigation/app_route.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_typography.dart';
-import '../../../../core/theme/theme_controller.dart';
-import '../../data/profile_repository.dart';
-import '../../../transactions/presentation/widgets/voice_transaction_flow.dart';
-import 'informasi_profil_page.dart';
-import 'ganti_pin_page.dart';
-import 'pengaturan_aksesibilitas_page.dart';
-import 'tentang_aplikasi_page.dart';
+import 'package:flutter/material.dart'; // widget dan tema dasar Flutter
+import 'package:flutter/semantics.dart'; // untuk pengumuman ke pembaca layar
+import 'package:flutter/services.dart'; // untuk SystemUiOverlayStyle (warna status bar)
+import '../../../../core/navigation/app_route.dart'; // helper pembuat rute navigasi
+import '../../../../core/theme/app_colors.dart'; // palet warna aplikasi
+import '../../../../core/theme/app_typography.dart'; // gaya teks standar aplikasi
+import '../../../../core/theme/theme_controller.dart'; // pengatur mode tema (terang/gelap/sistem)
+import '../../data/profile_repository.dart'; // sumber data profil pengguna
+import '../../../transactions/presentation/widgets/voice_transaction_flow.dart'; // alur pencatatan transaksi via suara
+import 'informasi_profil_page.dart'; // halaman detail informasi profil
+import 'ganti_pin_page.dart'; // halaman ganti PIN
+import 'pengaturan_aksesibilitas_page.dart'; // halaman pengaturan aksesibilitas
+import 'tentang_aplikasi_page.dart'; // halaman tentang aplikasi
 
 /// ─────────────────────────────────────────────────────────────────
 /// PROFILE PAGE  –  Halaman Profil & Pengaturan
@@ -20,12 +20,12 @@ class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
   @override
-  State<ProfilePage> createState() => _ProfilePageState();
+  State<ProfilePage> createState() => _ProfilePageState(); // buat objek state terkait
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  String _nama     = '';
-  String _jabatan  = '';
+  String _nama     = ''; // nama pengguna, diisi dari repository
+  String _jabatan  = ''; // jabatan/peran pengguna, diisi dari repository
   // Beda dari nama kosong: ini menandai proses baca dari basis data
   // belum selesai, supaya "Memuat..." tidak tertukar dengan "profil
   // memang belum diisi".
@@ -37,30 +37,30 @@ class _ProfilePageState extends State<ProfilePage> {
   // Mode Gelap TIDAK ada di sini lagi — itu sekarang punya bagiannya
   // sendiri (_pilihanTampilan) karena butuh 3 pilihan, bukan sakelar
   // hidup-mati, dan sudah benar-benar tersambung ke ThemeController.
-  bool _voiceMode = false;
-  bool _biometricAuth = false;
+  bool _voiceMode = false; // status sakelar mode suara (belum tersambung ke backend)
+  bool _biometricAuth = false; // status sakelar autentikasi biometrik (belum tersambung ke backend)
 
-  final _repo = ProfileRepository.instance;
+  final _repo = ProfileRepository.instance; // akses data profil lewat singleton repository
 
   @override
   void initState() {
     super.initState();
-    _muatProfil();
+    _muatProfil(); // muat data profil segera setelah widget dibuat
   }
 
   Future<void> _muatProfil() async {
-    final nama    = await _repo.bacaNama();
-    final jabatan = await _repo.bacaJabatan();
-    if (!mounted) return;
+    final nama    = await _repo.bacaNama(); // ambil nama dari penyimpanan
+    final jabatan = await _repo.bacaJabatan(); // ambil jabatan dari penyimpanan
+    if (!mounted) return; // batalkan bila widget sudah dilepas sebelum data siap
     setState(() {
-      _nama    = nama;
-      _jabatan = jabatan;
-      _sedangMemuat = false;
+      _nama    = nama; // simpan nama ke state agar UI diperbarui
+      _jabatan = jabatan; // simpan jabatan ke state
+      _sedangMemuat = false; // tandai proses muat selesai
     });
   }
 
   Future<void> _handleVoiceInput() async {
-    await mulaiCatatTransaksiSuara(context);
+    await mulaiCatatTransaksiSuara(context); // buka alur pencatatan transaksi lewat suara
   }
 
   // ── Warna sadar-tema ──────────────────────────────────────────────
@@ -70,61 +70,61 @@ class _ProfilePageState extends State<ProfilePage> {
   // sebagai ternary di puluhan tempat.
   static Color _kartu(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark
-          ? AppColors.darkSurface
-          : AppColors.white;
+          ? AppColors.darkSurface // warna kartu mode gelap
+          : AppColors.white; // warna kartu mode terang
 
   static Color _teksUtama(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark
-          ? AppColors.darkText
-          : AppColors.baseDark;
+          ? AppColors.darkText // warna teks utama mode gelap
+          : AppColors.baseDark; // warna teks utama mode terang
 
   static Color _teksMuted(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark
-          ? AppColors.darkTextMuted
-          : AppColors.textMuted;
+          ? AppColors.darkTextMuted // warna teks pudar mode gelap
+          : AppColors.textMuted; // warna teks pudar mode terang
 
   static Color _garis(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark
-          ? AppColors.darkDivider
-          : AppColors.divider;
+          ? AppColors.darkDivider // warna garis pemisah mode gelap
+          : AppColors.divider; // warna garis pemisah mode terang
 
   static Color _bahaya(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark
-          ? AppColors.darkExpense
-          : AppColors.tertiary500;
+          ? AppColors.darkExpense // warna peringatan/bahaya mode gelap
+          : AppColors.tertiary500; // warna peringatan/bahaya mode terang
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final bool gelap = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme; // skema warna aktif dari tema
+    final bool gelap = Theme.of(context).brightness == Brightness.dark; // deteksi mode gelap
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: gelap ? Brightness.light : Brightness.dark,
-        statusBarBrightness: gelap ? Brightness.dark : Brightness.light,
+        statusBarColor: Colors.transparent, // status bar transparan
+        statusBarIconBrightness: gelap ? Brightness.light : Brightness.dark, // ikon menyesuaikan mode
+        statusBarBrightness: gelap ? Brightness.dark : Brightness.light, // kecerahan status bar untuk iOS
       ),
       child: Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor, // latar halaman sesuai tema
       floatingActionButton: SizedBox(
         width: 64,
         height: 64,
         child: FloatingActionButton(
-        heroTag: 'fab_profile',
-        onPressed: _handleVoiceInput,
-        backgroundColor: scheme.primary,
-        elevation: 4,
-        shape: const CircleBorder(),
-        tooltip: 'Catat transaksi dengan suara',
+        heroTag: 'fab_profile', // tag unik agar tidak bentrok dengan FAB halaman lain
+        onPressed: _handleVoiceInput, // buka pencatatan transaksi suara saat ditekan
+        backgroundColor: scheme.primary, // warna latar tombol mengambang
+        elevation: 4, // tinggi bayangan tombol
+        shape: const CircleBorder(), // bentuk lingkaran
+        tooltip: 'Catat transaksi dengan suara', // teks bantuan saat ditekan lama
         // Semantics eksplisit, bukan cuma mengandalkan tooltip.
         // Tanpa label ini pembaca layar hanya menyebutnya "tombol"
         // tanpa keterangan, tak terbedakan dari tombol tambah lain.
         child: Semantics(
-          button: true,
-          label: 'Catat transaksi dengan suara',
-          excludeSemantics: true,
+          button: true, // beri tahu pembaca layar ini elemen tombol
+          label: 'Catat transaksi dengan suara', // teks yang dibacakan pembaca layar
+          excludeSemantics: true, // sembunyikan detail semantik anak, pakai label ini saja
           child: Icon(
-            Icons.mic_rounded,
-            color: scheme.onPrimary,
+            Icons.mic_rounded, // ikon mikrofon
+            color: scheme.onPrimary, // warna ikon kontras dengan latar primary
             size: 30,
           ),
         ),
@@ -134,7 +134,7 @@ class _ProfilePageState extends State<ProfilePage> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 18),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start, // rata kiri semua anak
             children: [
               const SizedBox(height: 28),
 
@@ -155,11 +155,11 @@ class _ProfilePageState extends State<ProfilePage> {
                       width: 80,
                       height: 80,
                       decoration: BoxDecoration(
-                        color: scheme.primary,
-                        shape: BoxShape.circle,
+                        color: scheme.primary, // latar lingkaran avatar
+                        shape: BoxShape.circle, // bentuk lingkaran
                       ),
                       child: Icon(
-                        Icons.person_outline,
+                        Icons.person_outline, // ikon avatar generik
                         size: 40,
                         color: scheme.onPrimary,
                       ),
@@ -181,7 +181,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _jabatan.isEmpty ? '' : _jabatan,
+                      _jabatan.isEmpty ? '' : _jabatan, // tampilkan jabatan bila ada
                       style: TextStyle(
                         fontSize: 13,
                         color: _teksMuted(context),
@@ -201,12 +201,12 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 8),
               Container(
                 decoration: BoxDecoration(
-                  color: _kartu(context),
+                  color: _kartu(context), // latar kartu sesuai tema
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: _garis(context)),
                 ),
                 child: Material(
-                  color: Colors.transparent,
+                  color: Colors.transparent, // agar efek ripple InkWell di dalamnya terlihat
                   borderRadius: BorderRadius.circular(14),
                   child: Column(
                     children: [
@@ -215,10 +215,10 @@ class _ProfilePageState extends State<ProfilePage> {
                         label: 'Mode Suara',
                         value: _voiceMode,
                         onChanged: (val) {
-                          setState(() => _voiceMode = val);
+                          setState(() => _voiceMode = val); // perbarui status sakelar mode suara
                           SemanticsService.sendAnnouncement(
                             View.of(context),
-                            'Mode suara ${val ? "dinyalakan" : "dimatikan"}',
+                            'Mode suara ${val ? "dinyalakan" : "dimatikan"}', // umumkan perubahan ke pembaca layar
                             Directionality.of(context),
                           );
                         },
@@ -229,7 +229,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         label: 'Autentikasi Biometrik',
                         value: _biometricAuth,
                         onChanged: (val) {
-                          setState(() => _biometricAuth = val);
+                          setState(() => _biometricAuth = val); // perbarui status sakelar biometrik
                           SemanticsService.sendAnnouncement(
                             View.of(context),
                             'Autentikasi biometrik '
@@ -239,9 +239,9 @@ class _ProfilePageState extends State<ProfilePage> {
                         },
                       ),
                       Divider(height: 1, indent: 46, color: _garis(context)),
-                      _pilihanTampilan(),
+                      _pilihanTampilan(), // baris pemilih mode tampilan (terang/gelap/sistem)
                       Divider(height: 1, indent: 46, color: _garis(context)),
-                      ..._daftarMenu(context),
+                      ..._daftarMenu(context), // sebar daftar item menu navigasi ke dalam Column
                     ],
                   ),
                 ),
@@ -265,7 +265,7 @@ class _ProfilePageState extends State<ProfilePage> {
         fontSize: 11,
         fontWeight: FontWeight.w600,
         color: _teksMuted(context),
-        letterSpacing: 0.8,
+        letterSpacing: 0.8, // jarak antar huruf lebih lebar untuk gaya label kecil
       ),
     );
   }
@@ -279,15 +279,15 @@ class _ProfilePageState extends State<ProfilePage> {
     // minHeight, bukan tinggi tetap — supaya baris ini tetap muat saat
     // ukuran teks sistem dimaksimalkan, bukannya label terpotong.
     return Semantics(
-      label: label,
-      toggled: value,
+      label: label, // teks yang dibacakan pembaca layar
+      toggled: value, // beri tahu status sakelar saat ini
       hint: 'Ketuk dua kali untuk mengubah',
       // Wajib diisi eksplisit. ExcludeSemantics di bawah membuang aksi
       // tap milik Switch itu sendiri, jadi tanpa baris ini TalkBack
       // mengumumkan "sakelar" beserta statusnya tapi ketuk dua kali
       // tidak melakukan apa pun — persis bug yang berulang kali
       // ditemukan di komponen kustom lain pada aplikasi ini.
-      onTap: () => onChanged(!value),
+      onTap: () => onChanged(!value), // aksi manual untuk pembaca layar, membalik nilai
       child: ExcludeSemantics(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -306,10 +306,10 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
                 Switch(
-                  value: value,
-                  onChanged: onChanged,
-                  activeThumbColor: AppColors.white,
-                  activeTrackColor: Theme.of(context).colorScheme.primary,
+                  value: value, // nilai sakelar saat ini
+                  onChanged: onChanged, // dipanggil saat pengguna mengetuk sakelar
+                  activeThumbColor: AppColors.white, // warna bulatan saat aktif
+                  activeTrackColor: Theme.of(context).colorScheme.primary, // warna trek saat aktif
                 ),
               ],
             ),
@@ -325,17 +325,17 @@ class _ProfilePageState extends State<ProfilePage> {
   /// (bukan di kartu pemanggil) supaya saat ThemeMode berubah, hanya
   /// tiga baris ini yang dibangun ulang — bukan seluruh kartu.
   Widget _pilihanTampilan() {
-    final ThemeController tc = ThemeController.instance;
+    final ThemeController tc = ThemeController.instance; // akses pengatur tema singleton
 
     return ValueListenableBuilder<ThemeMode>(
-      valueListenable: tc.mode,
+      valueListenable: tc.mode, // dengarkan perubahan mode tema aktif
       builder: (context, aktif, _) {
         return Column(
           children: [
             for (int i = 0; i < ThemeMode.values.length; i++) ...[
-              _buildBarisTampilan(ThemeMode.values[i], aktif, tc),
+              _buildBarisTampilan(ThemeMode.values[i], aktif, tc), // baris untuk tiap mode (terang/gelap/sistem)
               if (i < ThemeMode.values.length - 1)
-                Divider(height: 1, indent: 46, color: _garis(context)),
+                Divider(height: 1, indent: 46, color: _garis(context)), // garis pemisah kecuali baris terakhir
             ],
           ],
         );
@@ -344,15 +344,15 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildBarisTampilan(ThemeMode m, ThemeMode aktif, ThemeController tc) {
-    final bool terpilih = m == aktif;
+    final bool terpilih = m == aktif; // true bila mode ini yang sedang dipakai
     return Semantics(
       button: true,
       selected: terpilih,
-      label: tc.label(m),
+      label: tc.label(m), // nama mode yang dibacakan pembaca layar
       onTap: () => _pilihTampilan(m),
       excludeSemantics: true,
       child: InkWell(
-        onTap: () => _pilihTampilan(m),
+        onTap: () => _pilihTampilan(m), // ganti mode tampilan saat baris ini diketuk
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: ConstrainedBox(
@@ -361,8 +361,8 @@ class _ProfilePageState extends State<ProfilePage> {
               children: [
                 Icon(
                   terpilih
-                      ? Icons.radio_button_checked
-                      : Icons.radio_button_unchecked,
+                      ? Icons.radio_button_checked // tanda terpilih
+                      : Icons.radio_button_unchecked, // tanda belum terpilih
                   size: 20,
                   color: terpilih
                       ? Theme.of(context).colorScheme.primary
@@ -375,15 +375,15 @@ class _ProfilePageState extends State<ProfilePage> {
                     style: AppTypography.bodyLarge.copyWith(
                       color: _teksUtama(context),
                       fontWeight:
-                          terpilih ? FontWeight.w600 : FontWeight.w400,
+                          terpilih ? FontWeight.w600 : FontWeight.w400, // tebal bila terpilih
                     ),
                   ),
                 ),
                 Icon(
                   switch (m) {
-                    ThemeMode.light => Icons.light_mode_outlined,
-                    ThemeMode.dark => Icons.dark_mode_outlined,
-                    ThemeMode.system => Icons.smartphone_outlined,
+                    ThemeMode.light => Icons.light_mode_outlined, // ikon untuk mode terang
+                    ThemeMode.dark => Icons.dark_mode_outlined, // ikon untuk mode gelap
+                    ThemeMode.system => Icons.smartphone_outlined, // ikon untuk ikut sistem
                   },
                   size: 18,
                   color: _teksMuted(context),
@@ -398,14 +398,14 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _pilihTampilan(ThemeMode m) async {
     final ThemeController tc = ThemeController.instance;
-    await tc.ganti(m);
-    if (!mounted) return;
+    await tc.ganti(m); // terapkan mode tema yang dipilih
+    if (!mounted) return; // batalkan bila widget sudah dilepas
     // Pengguna tunanetra tidak melihat tampilan berubah, sedangkan
     // perubahan ini memengaruhi pengguna lain yang memakai perangkat
     // yang sama. Pengumuman ini yang memberitahunya.
     SemanticsService.sendAnnouncement(
       View.of(context),
-      'Tampilan diubah ke ${tc.label(m)}',
+      'Tampilan diubah ke ${tc.label(m)}', // umumkan mode baru
       Directionality.of(context),
     );
   }
@@ -423,7 +423,7 @@ class _ProfilePageState extends State<ProfilePage> {
         onTap: () async {
           await Navigator.push(
             context,
-            buatRute((_) => const InformasiProfilPage()),
+            buatRute((_) => const InformasiProfilPage()), // buka halaman informasi profil
           );
           // Reload nama setelah kembali
           _muatProfil();
@@ -434,7 +434,7 @@ class _ProfilePageState extends State<ProfilePage> {
         label: 'Ganti PIN',
         onTap: () => Navigator.push(
           context,
-          buatRute((_) => const GantiPinPage()),
+          buatRute((_) => const GantiPinPage()), // buka halaman ganti PIN
         ),
       ),
       _MenuItem(
@@ -442,7 +442,7 @@ class _ProfilePageState extends State<ProfilePage> {
         label: 'Pengaturan Aksesibilitas',
         onTap: () => Navigator.push(
           context,
-          buatRute((_) => const PengaturanAksesibilitasPage()),
+          buatRute((_) => const PengaturanAksesibilitasPage()), // buka halaman aksesibilitas
         ),
       ),
       _MenuItem(
@@ -450,20 +450,20 @@ class _ProfilePageState extends State<ProfilePage> {
         label: 'Tentang Aplikasi',
         onTap: () => Navigator.push(
           context,
-          buatRute((_) => const TentangAplikasiPage()),
+          buatRute((_) => const TentangAplikasiPage()), // buka halaman tentang aplikasi
         ),
       ),
       _MenuItem(
         icon: Icons.logout,
         label: 'Keluar',
-        onTap: () => _showLogoutDialog(context),
-        isDestructive: true,
+        onTap: () => _showLogoutDialog(context), // tampilkan konfirmasi keluar
+        isDestructive: true, // tandai sebagai aksi berisiko, diberi warna bahaya
       ),
     ];
 
     return List.generate(items.length, (index) {
       final item = items[index];
-      final bool isLast = index == items.length - 1;
+      final bool isLast = index == items.length - 1; // cek apakah ini item terakhir
       return Column(
         children: [
           ListTile(
@@ -485,16 +485,16 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
             trailing: item.isDestructive
-                ? null
+                ? null // item berbahaya tidak diberi panah navigasi
                 : Icon(
                     Icons.chevron_right,
                     size: 18,
                     color: _teksMuted(context),
                   ),
-            onTap: item.onTap,
+            onTap: item.onTap, // aksi saat item menu diketuk
           ),
           if (!isLast)
-            Divider(height: 1, indent: 52, color: _garis(context)),
+            Divider(height: 1, indent: 52, color: _garis(context)), // garis pemisah kecuali item terakhir
         ],
       );
     });
@@ -502,7 +502,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   // ── Dialog konfirmasi keluar ─────────────────────────────────────
   static void _showLogoutDialog(BuildContext context) {
-    final bool gelap = Theme.of(context).brightness == Brightness.dark;
+    final bool gelap = Theme.of(context).brightness == Brightness.dark; // deteksi mode gelap untuk dialog
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -525,14 +525,14 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(context), // tutup dialog tanpa aksi
             child: Text('Batal',
                 style: TextStyle(color: _teksMuted(context),
                     fontWeight: FontWeight.w500)),
           ),
           TextButton(
             onPressed: () {
-              Navigator.pop(context);
+              Navigator.pop(context); // tutup dialog
               // TODO: arahkan ke halaman login
             },
             // tertiary700 dari palet terang nyaris tak terbaca di atas
@@ -551,15 +551,15 @@ class _ProfilePageState extends State<ProfilePage> {
 
 // Model data untuk setiap item menu
 class _MenuItem {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final bool isDestructive;
+  final IconData icon; // ikon yang tampil di depan item
+  final String label; // teks label item
+  final VoidCallback onTap; // aksi saat item diketuk
+  final bool isDestructive; // true bila aksi ini berisiko (mis. keluar)
 
   const _MenuItem({
     required this.icon,
     required this.label,
     required this.onTap,
-    this.isDestructive = false,
+    this.isDestructive = false, // default bukan aksi berisiko
   });
 }

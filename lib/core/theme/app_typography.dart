@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart'; // Widget dan kelas gaya teks dasar
 
-import '../services/aksesibilitas_controller.dart';
-import 'app_colors.dart';
+import '../services/aksesibilitas_controller.dart'; // Sumber sakelar "Teks Tebal"
+import 'app_colors.dart'; // Palet warna aplikasi
 
 /// ─────────────────────────────────────────────────────────────────
 /// APP TYPOGRAPHY  –  Sistem tipografi terpusat
@@ -16,32 +16,32 @@ import 'app_colors.dart';
 /// ─────────────────────────────────────────────────────────────────
 
 class AppTypography {
-  AppTypography._();
+  AppTypography._(); // Constructor privat: kelas ini hanya berisi static member
 
   /// Menaikkan bobot font satu-dua tingkat saat Teks Tebal aktif.
   /// Dipetakan manual (bukan `FontWeight.values[index + n]`) supaya
   /// hasilnya selalu FontWeight yang valid dan lompatannya terasa
   /// jelas, bukan naik satu tingkat yang nyaris tak terlihat.
   static FontWeight _b(FontWeight dasar) {
-    if (!AksesibilitasController.instance.teksTebal.value) return dasar;
-    return switch (dasar) {
+    if (!AksesibilitasController.instance.teksTebal.value) return dasar; // Sakelar mati: pakai bobot asli
+    return switch (dasar) { // Petakan tiap bobot ke versi lebih tebal
       FontWeight.w400 => FontWeight.w700,
       FontWeight.w500 => FontWeight.w700,
       FontWeight.w600 => FontWeight.w800,
       FontWeight.w700 => FontWeight.w800,
       FontWeight.w800 => FontWeight.w900,
-      _ => FontWeight.w900,
+      _ => FontWeight.w900, // Bobot lain (mis. w900) tetap paling tebal
     };
   }
 
   // ── HEADING ──────────────────────────────────────────────────────
   /// Heading terbesar (30px, w700) - untuk judul halaman utama
   static TextStyle get headingLarge => TextStyle(
-    fontFamily: 'Inter',
+    fontFamily: 'Inter', // Font utama aplikasi
     fontSize: 30,
-    fontWeight: _b(FontWeight.w700),
+    fontWeight: _b(FontWeight.w700), // Bobot dinaikkan otomatis bila Teks Tebal aktif
     color: AppColors.baseDark,
-    height: 1.2,
+    height: 1.2, // Tinggi baris relatif terhadap ukuran font
   );
 
   /// Heading sedang (24px, w700) - untuk sub judul
@@ -105,7 +105,7 @@ class AppTypography {
     fontFamily: 'Inter',
     fontSize: 15,
     fontWeight: _b(FontWeight.w400),
-    color: AppColors.textMuted,
+    color: AppColors.textMuted, // Warna lebih pudar untuk teks sekunder
     height: 1.5,
   );
 
@@ -186,7 +186,7 @@ class AppTypography {
 
   // ── HELPER METHODS untuk Dynamic Colors ──────────────────────────
   /// Buat TextStyle dari preset dengan warna custom
-  static TextStyle copyWith({
+  static TextStyle copyWith({ // Ganti sebagian properti dari gaya yang sudah ada
     required TextStyle style,
     Color? color,
     double? fontSize,
@@ -203,7 +203,7 @@ class AppTypography {
 
   /// Body style dengan warna custom (untuk income/expense)
   static TextStyle bodyMediumWithColor(Color color) {
-    return bodyMedium.copyWith(color: color);
+    return bodyMedium.copyWith(color: color); // Pakai gaya bodyMedium tapi ganti warnanya
   }
 
   /// Title style dengan warna custom

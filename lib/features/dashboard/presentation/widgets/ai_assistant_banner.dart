@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
-import '../../../../core/theme/app_typography.dart';
-import '../../../../core/theme/theme_extensions.dart';
+import 'package:flutter/material.dart'; // Widget dasar Flutter
+import '../../../../core/theme/app_typography.dart'; // Gaya teks terpusat
+import '../../../../core/theme/theme_extensions.dart'; // Ekstensi warna tema kontekstual
 
 /// ─────────────────────────────────────────────────────────────────
 /// AI ASSISTANT BANNER  –  Banner promosi fitur Asisten Keuangan AI
@@ -39,7 +39,7 @@ class AiAssistantBanner extends StatelessWidget {
     // kartunya, tetapi pengguna tidak pernah sampai ke "Analisis
     // Keuangan" maupun "Tanya AI". Kini keterangan kartu dan tombol
     // berdiri sebagai simpul terpisah.
-    return Container(
+    return Container( // Kartu pembungkus seluruh banner
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -56,7 +56,7 @@ class AiAssistantBanner extends StatelessWidget {
           Semantics(
             label: 'Asisten Keuangan. AI siap membantu menganalisis '
                 'laporan keuangan dan menjawab pertanyaan seputar '
-                'usaha Anda. Tersedia dua tombol berikut.',
+                'usaha Anda. Tersedia dua tombol berikut.', // Deskripsi lengkap untuk pembaca layar
             excludeSemantics: true,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -111,7 +111,7 @@ class AiAssistantBanner extends StatelessWidget {
             icon: Icons.bar_chart_outlined,
             label: 'Analisis Keuangan',
             hint: 'Ketuk dua kali untuk membuka analisis keuangan',
-            onTap: onAnalysisTap ?? () {},
+            onTap: onAnalysisTap ?? () {}, // Fallback aksi kosong bila callback tidak diberikan
           ),
           const SizedBox(height: 10),
 
@@ -132,11 +132,11 @@ class AiAssistantBanner extends StatelessWidget {
 // PRIVATE: Tombol outline hijau (hanya dipakai di file ini)
 // ─────────────────────────────────────────────────────────────────
 
-class _AiOutlineButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String hint;
-  final VoidCallback onTap;
+class _AiOutlineButton extends StatelessWidget { // Tombol bergaya outline dengan info aksesibilitas
+  final IconData icon; // Ikon di sisi kiri tombol
+  final String label; // Teks tombol
+  final String hint; // Petunjuk tambahan untuk pembaca layar
+  final VoidCallback onTap; // Aksi saat tombol ditekan
 
   const _AiOutlineButton({
     required this.icon,
@@ -151,20 +151,20 @@ class _AiOutlineButton extends StatelessWidget {
     // Tanpa itu simpulnya berlabel "tombol" tetapi tidak punya aksi
     // tap, sehingga ketuk-dua-kali TalkBack tidak melakukan apa pun.
     return Semantics(
-      button: true,
+      button: true, // Umumkan sebagai tombol
       label: label,
-      hint: hint,
+      hint: hint, // Penjelasan tambahan yang dibacakan setelah label
       onTap: onTap,
       excludeSemantics: true,
-      child: InkWell(
+      child: InkWell( // Efek riak visual saat disentuh
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
           width: double.infinity,
-          constraints: const BoxConstraints(minHeight: 48),
+          constraints: const BoxConstraints(minHeight: 48), // Tinggi sentuh minimum aksesibilitas
           padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
-            color: Colors.transparent,
+            color: Colors.transparent, // Tombol outline: latar transparan
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: Theme.of(context).colorScheme.primary,

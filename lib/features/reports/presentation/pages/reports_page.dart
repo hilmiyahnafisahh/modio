@@ -1,17 +1,17 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/material.dart'; // widget dasar Flutter (Scaffold, Text, dll)
+import 'package:flutter/semantics.dart'; // untuk mengumumkan info ke pembaca layar (TalkBack)
+import 'package:flutter/services.dart'; // untuk SystemUiOverlayStyle (warna status bar)
 
-import '../../../../core/navigation/app_route.dart';
-import '../../../../core/theme/app_typography.dart';
-import '../../../../core/theme/theme_extensions.dart';
-import '../../../../core/utils/currency_formatter.dart';
-import '../../data/laporan_repository.dart';
-import '../../data/report_model.dart';
-import '../../../ai_chat/presentation/pages/ai_assistant_page.dart';
-import '../../../dashboard/presentation/widgets/ai_assistant_banner.dart';
-import '../../../dashboard/presentation/widgets/balance_card.dart';
-import '../../../transactions/presentation/widgets/voice_transaction_flow.dart';
+import '../../../../core/navigation/app_route.dart'; // helper buatRute() untuk navigasi antar halaman
+import '../../../../core/theme/app_typography.dart'; // kumpulan gaya teks (font, ukuran) aplikasi
+import '../../../../core/theme/theme_extensions.dart'; // ekstensi warna tema (context.warnaX, context.gelap)
+import '../../../../core/utils/currency_formatter.dart'; // format angka menjadi teks Rupiah
+import '../../data/laporan_repository.dart'; // sumber data laporan keuangan bulanan
+import '../../data/report_model.dart'; // model data LaporanBulanan, RincianKategori, dll
+import '../../../ai_chat/presentation/pages/ai_assistant_page.dart'; // halaman asisten AI
+import '../../../dashboard/presentation/widgets/ai_assistant_banner.dart'; // banner ajakan asisten AI
+import '../../../dashboard/presentation/widgets/balance_card.dart'; // kartu saldo/laba yang dipakai bareng dashboard
+import '../../../transactions/presentation/widgets/voice_transaction_flow.dart'; // alur catat transaksi via suara
 
 /// ─────────────────────────────────────────────────────────────────
 /// REPORTS PAGE  –  Laporan keuangan bulanan
@@ -21,117 +21,117 @@ import '../../../transactions/presentation/widgets/voice_transaction_flow.dart';
 /// dot indicator, dan bagian Asisten Keuangan.
 /// ─────────────────────────────────────────────────────────────────
 
-class ReportsPage extends StatefulWidget {
-  const ReportsPage({super.key});
+class ReportsPage extends StatefulWidget { // widget halaman Laporan, punya state internal
+  const ReportsPage({super.key}); // konstruktor const, key diteruskan ke induk
 
   @override
-  State<ReportsPage> createState() => _ReportsPageState();
+  State<ReportsPage> createState() => _ReportsPageState(); // buat objek state terkait halaman ini
 }
 
-class _ReportsPageState extends State<ReportsPage> {
-  final LaporanRepository _repo = LaporanRepository();
+class _ReportsPageState extends State<ReportsPage> { // kelas state untuk ReportsPage
+  final LaporanRepository _repo = LaporanRepository(); // sumber data laporan, sekali dibuat
 
-  late Future<LaporanBulanan> _laporan;
+  late Future<LaporanBulanan> _laporan; // data laporan async, diisi belakangan di initState
 
-  late int _tahun;
-  late int _bulan;
+  late int _tahun; // tahun periode yang sedang dipilih
+  late int _bulan; // bulan periode yang sedang dipilih
 
-  static const List<String> _namaBulanPanjang = [
+  static const List<String> _namaBulanPanjang = [ // daftar nama bulan; index 0 kosong (1=Jan, dst)
     '',
     'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
     'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
   ];
 
   @override
-  void initState() {
-    super.initState();
-    final DateTime now = DateTime.now();
-    _tahun = now.year;
-    _bulan = now.month;
-    _muat();
+  void initState() { // dipanggil sekali saat widget pertama kali dibuat
+    super.initState(); // wajib panggil versi induk terlebih dahulu
+    final DateTime now = DateTime.now(); // ambil tanggal & waktu sekarang
+    _tahun = now.year; // set tahun awal ke tahun sekarang
+    _bulan = now.month; // set bulan awal ke bulan sekarang
+    _muat(); // muat data laporan untuk periode awal ini
   }
 
-  void _muat() {
-    setState(() {
-      _laporan = _repo.laporanBulan(tahun: _tahun, bulan: _bulan);
+  void _muat() { // fungsi untuk memuat/memuat ulang data laporan
+    setState(() { // beri tahu Flutter agar UI dibangun ulang
+      _laporan = _repo.laporanBulan(tahun: _tahun, bulan: _bulan); // ambil laporan sesuai periode aktif
     });
   }
 
-  Future<void> _bukaKalender() async {
-    final DateTime? result = await showDialog<DateTime>(
+  Future<void> _bukaKalender() async { // buka dialog pemilih bulan/tahun
+    final DateTime? result = await showDialog<DateTime>( // tampilkan dialog, tunggu hasilnya
       context: context,
-      builder: (_) => _MonthPickerDialog(
-        initialDate: DateTime(_tahun, _bulan),
+      builder: (_) => _MonthPickerDialog( // bangun dialog pemilih bulan
+        initialDate: DateTime(_tahun, _bulan), // tanggal awal sesuai periode aktif saat ini
       ),
     );
-    if (result != null && mounted) {
-      setState(() {
-        _tahun = result.year;
-        _bulan = result.month;
+    if (result != null && mounted) { // proses hanya jika ada hasil & widget masih hidup
+      setState(() { // perbarui state periode terpilih
+        _tahun = result.year; // simpan tahun baru dari dialog
+        _bulan = result.month; // simpan bulan baru dari dialog
       });
-      _muat();
-      final LaporanBulanan l = await _laporan;
-      if (!mounted) return;
-      SemanticsService.sendAnnouncement(View.of(context), l.narasi, Directionality.of(context));
+      _muat(); // muat ulang laporan untuk periode baru
+      final LaporanBulanan l = await _laporan; // tunggu data laporan selesai dimuat
+      if (!mounted) return; // batalkan jika widget sudah dilepas selagi menunggu
+      SemanticsService.sendAnnouncement(View.of(context), l.narasi, Directionality.of(context)); // umumkan hasil ke pembaca layar
     }
   }
 
-  String get _labelPeriode => '${_namaBulanPanjang[_bulan]} $_tahun';
+  String get _labelPeriode => '${_namaBulanPanjang[_bulan]} $_tahun'; // teks label periode, mis. "Januari 2026"
 
-  Future<void> _handleVoiceInput() async {
-    final bool? tersimpan = await mulaiCatatTransaksiSuara(context);
-    if (tersimpan == true && mounted) _muat();
+  Future<void> _handleVoiceInput() async { // tangani input suara dari tombol mic
+    final bool? tersimpan = await mulaiCatatTransaksiSuara(context); // jalankan alur catat transaksi via suara
+    if (tersimpan == true && mounted) _muat(); // jika ada transaksi baru tersimpan, muat ulang data
   }
 
   @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return AnnotatedRegion<SystemUiOverlayStyle>(
+  Widget build(BuildContext context) { // membangun tampilan halaman ini
+    final scheme = Theme.of(context).colorScheme; // ambil skema warna dari tema aktif
+    return AnnotatedRegion<SystemUiOverlayStyle>( // atur tampilan status bar sistem
       value: SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
+        statusBarColor: Colors.transparent, // status bar transparan
         statusBarIconBrightness:
-            context.gelap ? Brightness.light : Brightness.dark,
-        statusBarBrightness: context.gelap ? Brightness.dark : Brightness.light,
+            context.gelap ? Brightness.light : Brightness.dark, // ikon terang di mode gelap, gelap di mode terang
+        statusBarBrightness: context.gelap ? Brightness.dark : Brightness.light, // untuk iOS
       ),
-      child: Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      floatingActionButton: SizedBox(
+      child: Scaffold( // kerangka halaman (body, floating action button, dll)
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor, // warna latar sesuai tema
+      floatingActionButton: SizedBox( // bungkus FAB agar ukurannya tetap
         width: 64,
         height: 64,
-        child: FloatingActionButton(
-        heroTag: 'fab_reports',
-        onPressed: _handleVoiceInput,
-        backgroundColor: scheme.primary,
-        elevation: 4,
-        shape: const CircleBorder(),
-        tooltip: 'Catat transaksi dengan suara',
+        child: FloatingActionButton( // tombol mengambang untuk catat suara
+        heroTag: 'fab_reports', // tag unik agar tak bentrok dengan FAB halaman lain
+        onPressed: _handleVoiceInput, // aksi saat tombol ditekan
+        backgroundColor: scheme.primary, // warna latar sesuai tema
+        elevation: 4, // tinggi bayangan tombol
+        shape: const CircleBorder(), // bentuk lingkaran
+        tooltip: 'Catat transaksi dengan suara', // teks bantuan saat ditekan lama
         // Semantics eksplisit, bukan cuma mengandalkan tooltip.
         // Tanpa label ini pembaca layar hanya menyebutnya "tombol"
         // tanpa keterangan, tak terbedakan dari tombol tambah lain.
-        child: Semantics(
-          button: true,
-          label: 'Catat transaksi dengan suara',
-          excludeSemantics: true,
+        child: Semantics( // info aksesibilitas eksplisit untuk tombol ini
+          button: true, // beri tahu pembaca layar bahwa ini tombol
+          label: 'Catat transaksi dengan suara', // label yang diucapkan
+          excludeSemantics: true, // sembunyikan info semantik dari widget anak
           child: Icon(
-            Icons.mic_rounded,
-            color: scheme.onPrimary,
-            size: 30,
+            Icons.mic_rounded, // ikon mikrofon
+            color: scheme.onPrimary, // warna kontras di atas warna primary
+            size: 30, // ukuran ikon
           ),
         ),
         ),
       ),
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () async => _muat(),
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      body: SafeArea( // hindari area yang terpotong notch/status bar
+        child: RefreshIndicator( // gestur tarik ke bawah untuk refresh data
+          onRefresh: () async => _muat(), // muat ulang data saat ditarik
+          child: SingleChildScrollView( // izinkan konten digulir
+            physics: const AlwaysScrollableScrollPhysics(), // tetap bisa ditarik walau konten pendek
+            child: Column( // susun konten secara vertikal
+              crossAxisAlignment: CrossAxisAlignment.start, // rata kiri
               children: [
                 // ── Header ──────────────────────────────────────
-                _buildHeader(),
+                _buildHeader(), // tampilkan judul halaman
 
-                Padding(
+                Padding( // beri jarak dari tepi kiri-kanan
                   padding: const EdgeInsets.symmetric(horizontal: 18),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -140,39 +140,39 @@ class _ReportsPageState extends State<ReportsPage> {
                       // lain (Dashboard 20, History 16) — sebelumnya
                       // hanya 4, sehingga judul dan "Periode" terasa
                       // menempel.
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 20), // jarak vertikal antar bagian
 
                       // ── Label Periode ────────────────────────
-                      Text(
+                      Text( // label kecil "Periode"
                         'Periode',
                         style: AppTypography.labelSmall.copyWith(
                           color: context.warnaTeksUtama,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 8), // jarak vertikal kecil
 
                       // ── Tombol Kalender ──────────────────────
-                      _buildPeriodePicker(),
-                      const SizedBox(height: 22),
+                      _buildPeriodePicker(), // tombol pemilih periode (kalender)
+                      const SizedBox(height: 22), // jarak vertikal
 
                       // ── Konten Laporan ───────────────────────
-                      FutureBuilder<LaporanBulanan>(
-                        future: _laporan,
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState != ConnectionState.done) {
-                            return SizedBox(
+                      FutureBuilder<LaporanBulanan>( // bangun UI berdasarkan status Future
+                        future: _laporan, // future data laporan yang dipantau
+                        builder: (context, snapshot) { // dipanggil tiap kali status future berubah
+                          if (snapshot.connectionState != ConnectionState.done) { // masih memuat data
+                            return SizedBox( // area loading dengan tinggi tetap
                               height: 300,
                               child: Center(
-                                child: CircularProgressIndicator(
+                                child: CircularProgressIndicator( // indikator berputar
                                   color: Theme.of(context).colorScheme.primary,
                                 ),
                               ),
                             );
                           }
-                          if (snapshot.hasError) {
+                          if (snapshot.hasError) { // jika gagal memuat data laporan
                             return Padding(
                               padding: const EdgeInsets.symmetric(vertical: 40),
-                              child: Text(
+                              child: Text( // pesan error ramah pengguna
                                 'Laporan tidak bisa dimuat. Tutup aplikasi '
                                 'lalu buka lagi. Data Anda masih tersimpan.',
                                 style: AppTypography.bodyLarge.copyWith(
@@ -181,14 +181,14 @@ class _ReportsPageState extends State<ReportsPage> {
                               ),
                             );
                           }
-                          return _buildIsi(snapshot.data!);
+                          return _buildIsi(snapshot.data!); // data siap, tampilkan isi laporan
                         },
                       ),
 
                       // 120: tinggi tombol mic (64) + jarak dari tepi
                       // bawah — tanpa ini konten terakhir tertutup
                       // separuh oleh tombol mic yang mengambang.
-                      const SizedBox(height: 120),
+                      const SizedBox(height: 120), // jarak agar tak tertutup tombol mic
                     ],
                   ),
                 ),
@@ -201,11 +201,11 @@ class _ReportsPageState extends State<ReportsPage> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader() { // bangun bagian judul halaman
     return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 28, 18, 0),
+      padding: const EdgeInsets.fromLTRB(18, 28, 18, 0), // jarak tepi khusus judul
       child: Text(
-        'Laporan Laba Rugi',
+        'Laporan Laba Rugi', // judul halaman
         style: AppTypography.headingMedium.copyWith(
           color: context.warnaTeksUtama,
         ),
@@ -213,34 +213,34 @@ class _ReportsPageState extends State<ReportsPage> {
     );
   }
 
-  Widget _buildPeriodePicker() {
-    return Semantics(
+  Widget _buildPeriodePicker() { // bangun tombol pemilih periode
+    return Semantics( // info aksesibilitas untuk tombol ini
       button: true,
-      label: 'Pilih periode: $_labelPeriode',
-      hint: 'Ketuk dua kali untuk memilih bulan dan tahun',
-      onTap: _bukaKalender,
+      label: 'Pilih periode: $_labelPeriode', // label yang diucapkan pembaca layar
+      hint: 'Ketuk dua kali untuk memilih bulan dan tahun', // petunjuk aksi
+      onTap: _bukaKalender, // aksi semantik saat diketuk
       excludeSemantics: true,
-      child: InkWell(
-        onTap: _bukaKalender,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
+      child: InkWell( // efek ripple saat ditekan
+        onTap: _bukaKalender, // buka dialog kalender
+        borderRadius: BorderRadius.circular(10), // radius efek ripple
+        child: Container( // kotak tombol
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-          decoration: BoxDecoration(
-            color: context.warnaKartu,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: context.warnaGaris),
+          decoration: BoxDecoration( // tampilan kotak
+            color: context.warnaKartu, // warna latar kartu
+            borderRadius: BorderRadius.circular(10), // sudut membulat
+            border: Border.all(color: context.warnaGaris), // garis tepi
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+          child: Row( // ikon + teks sejajar
+            mainAxisSize: MainAxisSize.min, // ukuran seminimal isinya
             children: [
               Icon(
-                Icons.calendar_month_outlined,
+                Icons.calendar_month_outlined, // ikon kalender
                 size: 18,
                 color: context.warnaTeksMuted,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 8), // jarak horizontal
               Text(
-                _labelPeriode,
+                _labelPeriode, // teks label periode aktif
                 style: AppTypography.labelSmall.copyWith(
                   color: context.warnaTeksUtama,
                 ),
@@ -252,7 +252,7 @@ class _ReportsPageState extends State<ReportsPage> {
     );
   }
 
-  Widget _buildIsi(LaporanBulanan l) {
+  Widget _buildIsi(LaporanBulanan l) { // bangun isi laporan setelah data siap
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -260,49 +260,52 @@ class _ReportsPageState extends State<ReportsPage> {
         // Widget yang sama dengan kartu Saldo di dashboard, agar
         // gaya visualnya senada — bukan kartu terpisah dengan
         // tampilan sendiri.
-        BalanceCard(
-          balance: l.labaBersih.abs(),
-          period: l.labelPeriode,
-          title: l.untung ? 'Laba Usaha' : 'Rugi',
+        BalanceCard( // kartu ringkasan laba/rugi
+          balance: l.labaBersih.abs(), // nilai absolut laba/rugi
+          period: l.labelPeriode, // label periode laporan
+          title: l.untung ? 'Laba Usaha' : 'Rugi', // judul sesuai status untung/rugi
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 20), // jarak vertikal
 
         // ── Kartu Pendapatan ─────────────────────────────────
-        _SeksiKeuangan(
+        _SeksiKeuangan( // kartu rincian pendapatan
           judul: 'Pendapatan',
           subjudul: 'Hasil penjualan',
-          total: l.totalPendapatan,
-          totalWarna: context.warnaMasuk,
-          icon: Icons.arrow_outward_rounded,
-          iconBgColor: context.latarMasuk,
-          iconColor: context.warnaMasuk,
-          rincian: l.rincianPendapatan,
-          dotWarna: context.warnaMasuk,
+          total: l.totalPendapatan, // total nilai pendapatan
+          totalWarna: context.warnaMasuk, // warna khas transaksi masuk
+          icon: Icons.arrow_outward_rounded, // ikon panah keluar (uang masuk)
+          iconBgColor: context.latarMasuk, // warna latar lingkaran ikon
+          iconColor: context.warnaMasuk, // warna ikon & garis tepinya
+          rincian: l.rincianPendapatan, // daftar kategori pendapatan
+          dotWarna: context.warnaMasuk, // warna titik penanda kategori
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 16), // jarak vertikal
 
         // ── Kartu Beban Biaya ────────────────────────────────
-        _SeksiKeuangan(
+        _SeksiKeuangan( // kartu rincian beban biaya
           judul: 'Beban Biaya',
           subjudul: 'Biaya biaya yang keluar',
-          total: l.totalBeban,
-          totalWarna: context.warnaKeluar,
-          icon: Icons.south_west_rounded,
-          iconBgColor: context.latarKeluar,
-          iconColor: context.warnaKeluar,
-          rincian: l.rincianBeban,
-          dotWarna: context.warnaKeluar,
+          total: l.totalBeban, // total nilai beban
+          totalWarna: context.warnaKeluar, // warna khas transaksi keluar
+          icon: Icons.south_west_rounded, // ikon panah masuk (uang keluar)
+          iconBgColor: context.latarKeluar, // warna latar lingkaran ikon
+          iconColor: context.warnaKeluar, // warna ikon & garis tepinya
+          rincian: l.rincianBeban, // daftar kategori beban
+          dotWarna: context.warnaKeluar, // warna titik penanda kategori
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 20), // jarak vertikal
 
         // ── Asisten Keuangan ─────────────────────────────────
-        _AsistenKeuanganSection(),
+        _AsistenKeuanganSection(), // bagian ajakan pakai asisten AI
       ],
     );
   }
 }
 
 /*
+// Blok ini adalah kode lama yang sudah dinonaktifkan (dikomentari),
+// digantikan oleh _SeksiKeuangan & _KategoriRincianTile di bawah.
+// Dibiarkan sebagai arsip/referensi, tidak lagi dijalankan.
 /// Rekap transaksi per minggu pada bulan yang dipilih.
 ///
 /// Detail sengaja ditampilkan langsung di halaman agar pengguna tidak perlu
@@ -585,18 +588,18 @@ class _RincianTransaksi extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // Kartu Seksi Keuangan (Pendapatan / Beban Biaya)
 // ─────────────────────────────────────────────────────────────────────────────
-class _SeksiKeuangan extends StatelessWidget {
-  final String judul;
-  final String subjudul;
-  final int total;
-  final Color totalWarna;
-  final IconData icon;
-  final Color iconBgColor;
-  final Color iconColor;
-  final List<RincianKategori> rincian;
-  final Color dotWarna;
+class _SeksiKeuangan extends StatelessWidget { // kartu tampilan Pendapatan/Beban dengan daftar kategori
+  final String judul; // judul kartu (mis. "Pendapatan")
+  final String subjudul; // subjudul kartu (mis. "Hasil penjualan")
+  final int total; // total nominal kartu ini
+  final Color totalWarna; // warna teks nominal total
+  final IconData icon; // ikon kategori kartu
+  final Color iconBgColor; // warna latar lingkaran ikon
+  final Color iconColor; // warna ikon & garis tepinya
+  final List<RincianKategori> rincian; // daftar kategori beserta detailnya
+  final Color dotWarna; // warna titik penanda tiap kategori
 
-  const _SeksiKeuangan({
+  const _SeksiKeuangan({ // konstruktor, semua field wajib diisi
     required this.judul,
     required this.subjudul,
     required this.total,
@@ -609,9 +612,9 @@ class _SeksiKeuangan extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
+  Widget build(BuildContext context) { // bangun tampilan kartu ini
+    return Container( // bungkus dengan kartu bertepi & sudut membulat
+      width: double.infinity, // lebar penuh
       decoration: BoxDecoration(
         color: context.warnaKartu,
         borderRadius: BorderRadius.circular(16),
@@ -625,8 +628,8 @@ class _SeksiKeuangan extends StatelessWidget {
           // padahal daftar kategori seharusnya selalu terlihat, dan
           // yang perlu bisa disembunyikan hanyalah transaksi di dalam
           // tiap kategori, satu per satu.
-          Semantics(
-            label: '$judul. Total ${CurrencyFormatter.spoken(total)}. '
+          Semantics( // info aksesibilitas untuk header kartu
+            label: '$judul. Total ${CurrencyFormatter.spoken(total)}. ' // label lengkap yang diucapkan pembaca layar
                 '${rincian.length} kategori.',
             excludeSemantics: true,
             child: Padding(
@@ -634,7 +637,7 @@ class _SeksiKeuangan extends StatelessWidget {
               child: Row(
                 children: [
                   // Ikon kategori
-                  Container(
+                  Container( // lingkaran ikon kategori
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
@@ -645,25 +648,25 @@ class _SeksiKeuangan extends StatelessWidget {
                       // sengaja gelap juga (lihat catatan warnaMasuk/
                       // warnaKeluar), sehingga butuh batas eksplisit
                       // supaya tetap terlihat sebagai lingkaran.
-                      border: Border.all(color: iconColor, width: 1.5),
+                      border: Border.all(color: iconColor, width: 1.5), // garis tepi agar lingkaran tetap terlihat
                     ),
-                    child: Icon(icon, color: iconColor, size: 22),
+                    child: Icon(icon, color: iconColor, size: 22), // ikon di tengah lingkaran
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 12), // jarak horizontal
                   // Judul & subjudul
-                  Expanded(
+                  Expanded( // isi sisa ruang horizontal
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          judul,
+                          judul, // teks judul kartu
                           style: AppTypography.titleMedium.copyWith(
                             color: context.warnaTeksUtama,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 2), // jarak kecil
                         Text(
-                          subjudul,
+                          subjudul, // teks subjudul kartu
                           style: AppTypography.bodySmall.copyWith(
                             color: context.warnaTeksMuted,
                           ),
@@ -672,7 +675,7 @@ class _SeksiKeuangan extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    CurrencyFormatter.format(total),
+                    CurrencyFormatter.format(total), // total dalam format Rupiah
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
@@ -688,18 +691,18 @@ class _SeksiKeuangan extends StatelessWidget {
           // Setiap kategori adalah baris sendiri yang selalu tampil.
           // Transaksi di dalamnya baru muncul kalau baris kategori itu
           // diketuk, dan itu tidak memengaruhi kategori lain.
-          if (rincian.isNotEmpty) ...[
-            Divider(height: 1, color: context.warnaGaris),
+          if (rincian.isNotEmpty) ...[ // hanya tampilkan daftar jika ada kategori
+            Divider(height: 1, color: context.warnaGaris), // garis pemisah
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
               child: Column(
                 children: [
-                  for (final kategori in rincian) ...[
-                    _KategoriRincianTile(
+                  for (final kategori in rincian) ...[ // ulangi untuk tiap kategori
+                    _KategoriRincianTile( // baris satu kategori
                       kategori: kategori,
                       dotWarna: dotWarna,
                     ),
-                    if (kategori != rincian.last)
+                    if (kategori != rincian.last) // beri garis kecuali kategori terakhir
                       Divider(height: 18, color: context.warnaGaris),
                   ],
                 ],
@@ -716,9 +719,9 @@ class _SeksiKeuangan extends StatelessWidget {
 ///
 /// Daftar transaksinya bisa dibuka-tutup sendiri, terpisah dari
 /// kategori lain di kartu yang sama.
-class _KategoriRincianTile extends StatefulWidget {
-  final RincianKategori kategori;
-  final Color dotWarna;
+class _KategoriRincianTile extends StatefulWidget { // baris kategori yang bisa dibuka-tutup
+  final RincianKategori kategori; // data kategori & transaksinya
+  final Color dotWarna; // warna titik penanda kategori
 
   const _KategoriRincianTile({
     required this.kategori,
@@ -726,30 +729,30 @@ class _KategoriRincianTile extends StatefulWidget {
   });
 
   @override
-  State<_KategoriRincianTile> createState() => _KategoriRincianTileState();
+  State<_KategoriRincianTile> createState() => _KategoriRincianTileState(); // buat state terkait
 }
 
 class _KategoriRincianTileState extends State<_KategoriRincianTile> {
-  bool _terbuka = false;
+  bool _terbuka = false; // status apakah daftar transaksi sedang terbuka
 
   // Kategori dari data lama mungkin belum menyimpan daftar
   // transaksinya, jadi tidak ada apa pun untuk dibuka.
-  bool get _bisaBuka => widget.kategori.transaksi.isNotEmpty;
+  bool get _bisaBuka => widget.kategori.transaksi.isNotEmpty; // hanya bisa dibuka jika ada transaksi
 
   @override
   Widget build(BuildContext context) {
-    final RincianKategori kategori = widget.kategori;
+    final RincianKategori kategori = widget.kategori; // ambil data kategori dari widget
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Semantics(
-          button: _bisaBuka,
-          expanded: _terbuka,
-          label: 'Kategori ${kategori.nama}, total '
+          button: _bisaBuka, // hanya berperan sebagai tombol jika bisa dibuka
+          expanded: _terbuka, // beri tahu status terbuka/tertutup
+          label: 'Kategori ${kategori.nama}, total ' // label lengkap untuk pembaca layar
               '${CurrencyFormatter.spoken(kategori.total)}, '
               '${kategori.jumlahTransaksi} transaksi.',
-          hint: _bisaBuka
+          hint: _bisaBuka // petunjuk aksi sesuai status buka/tutup
               ? (_terbuka
                   ? 'Ketuk dua kali untuk menyembunyikan transaksi'
                   : 'Ketuk dua kali untuk menampilkan transaksi')
@@ -757,18 +760,18 @@ class _KategoriRincianTileState extends State<_KategoriRincianTile> {
           // onTap dipasang di simpul semantik ini sendiri, bukan
           // hanya di InkWell, supaya TalkBack bisa membuka DAN
           // menutup baris ini lewat ketuk dua kali.
-          onTap:
+          onTap: // aksi ketuk semantik: buka/tutup daftar transaksi
               _bisaBuka ? () => setState(() => _terbuka = !_terbuka) : null,
           excludeSemantics: true,
-          child: InkWell(
-            onTap:
+          child: InkWell( // efek ripple visual
+            onTap: // toggle buka/tutup daftar transaksi
                 _bisaBuka ? () => setState(() => _terbuka = !_terbuka) : null,
             borderRadius: BorderRadius.circular(8),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Row(
                 children: [
-                  Container(
+                  Container( // titik warna kecil penanda kategori
                     width: 9,
                     height: 9,
                     decoration: BoxDecoration(
@@ -776,26 +779,26 @@ class _KategoriRincianTileState extends State<_KategoriRincianTile> {
                       shape: BoxShape.circle,
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 8), // jarak horizontal
                   Expanded(
                     child: Text(
-                      kategori.nama,
+                      kategori.nama, // nama kategori
                       style: AppTypography.bodySmall.copyWith(
                         color: context.warnaTeksUtama,
                       ),
                     ),
                   ),
                   Text(
-                    CurrencyFormatter.format(kategori.total),
+                    CurrencyFormatter.format(kategori.total), // total kategori dalam Rupiah
                     style: AppTypography.bodySmall.copyWith(
                       color: context.warnaTeksUtama,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  if (_bisaBuka) ...[
+                  if (_bisaBuka) ...[ // tampilkan panah hanya jika bisa dibuka
                     const SizedBox(width: 4),
                     Icon(
-                      _terbuka
+                      _terbuka // panah arah sesuai status buka/tutup
                           ? Icons.keyboard_arrow_up_rounded
                           : Icons.keyboard_arrow_down_rounded,
                       size: 18,
@@ -807,14 +810,14 @@ class _KategoriRincianTileState extends State<_KategoriRincianTile> {
             ),
           ),
         ),
-        if (_terbuka)
+        if (_terbuka) // tampilkan daftar transaksi hanya jika terbuka
           Padding(
             padding: const EdgeInsets.only(left: 17, top: 2, bottom: 2),
             child: Column(
               children: [
-                for (final transaksi in kategori.transaksi)
+                for (final transaksi in kategori.transaksi) // ulangi untuk tiap transaksi
                   Semantics(
-                    label: '${transaksi.title}. '
+                    label: '${transaksi.title}. ' // label lengkap transaksi untuk pembaca layar
                         '${DateFormatter.dateWithMonth(transaksi.occurredAt.toLocal())}. '
                         '${transaksi.method}. '
                         '${CurrencyFormatter.spoken(transaksi.nominal)}.',
@@ -828,14 +831,14 @@ class _KategoriRincianTileState extends State<_KategoriRincianTile> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  transaksi.title,
+                                  transaksi.title, // judul transaksi
                                   style: AppTypography.labelMedium.copyWith(
                                     color: context.warnaTeksUtama,
                                   ),
                                 ),
-                                const SizedBox(height: 2),
+                                const SizedBox(height: 2), // jarak kecil
                                 Text(
-                                  '${DateFormatter.short(transaksi.occurredAt.toLocal())} · ${transaksi.method}',
+                                  '${DateFormatter.short(transaksi.occurredAt.toLocal())} · ${transaksi.method}', // tanggal singkat & metode
                                   style: AppTypography.bodySmall.copyWith(
                                     color: context.warnaTeksMuted,
                                   ),
@@ -844,7 +847,7 @@ class _KategoriRincianTileState extends State<_KategoriRincianTile> {
                             ),
                           ),
                           Text(
-                            CurrencyFormatter.format(transaksi.nominal),
+                            CurrencyFormatter.format(transaksi.nominal), // nominal transaksi dalam Rupiah
                             style: AppTypography.bodySmall.copyWith(
                               color: context.warnaTeksUtama,
                               fontWeight: FontWeight.w600,
@@ -866,17 +869,17 @@ class _KategoriRincianTileState extends State<_KategoriRincianTile> {
 // Bagian Asisten Keuangan  –  pakai AiAssistantBanner yang sama dengan dashboard
 // ─────────────────────────────────────────────────────────────────────────────
 // ignore: unused_element
-class _AsistenKeuanganSection extends StatelessWidget {
+class _AsistenKeuanganSection extends StatelessWidget { // bagian ajakan pakai asisten AI
   const _AsistenKeuanganSection();
 
   @override
   Widget build(BuildContext context) {
-    return AiAssistantBanner(
-      onAnalysisTap: () => Navigator.push(
+    return AiAssistantBanner( // banner ajakan analisis/chat dengan AI
+      onAnalysisTap: () => Navigator.push( // buka halaman asisten AI saat "Analisis" ditekan
         context,
         buatRute((_) => const AiAssistantPage()),
       ),
-      onChatTap: () => Navigator.push(
+      onChatTap: () => Navigator.push( // buka halaman asisten AI saat "Chat" ditekan
         context,
         buatRute((_) => const AiAssistantPage()),
       ),
@@ -887,25 +890,25 @@ class _AsistenKeuanganSection extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // Dialog Pilih Bulan
 // ─────────────────────────────────────────────────────────────────────────────
-class _MonthPickerDialog extends StatefulWidget {
-  final DateTime initialDate;
+class _MonthPickerDialog extends StatefulWidget { // dialog pemilih bulan & tahun
+  final DateTime initialDate; // tanggal awal saat dialog dibuka
   const _MonthPickerDialog({required this.initialDate});
 
   @override
-  State<_MonthPickerDialog> createState() => _MonthPickerDialogState();
+  State<_MonthPickerDialog> createState() => _MonthPickerDialogState(); // buat state terkait
 }
 
 class _MonthPickerDialogState extends State<_MonthPickerDialog> {
-  late int _tahun;
-  late int _bulan;
+  late int _tahun; // tahun yang sedang dipilih di dialog
+  late int _bulan; // bulan yang sedang dipilih di dialog
 
-  static const List<String> _singkat = [
+  static const List<String> _singkat = [ // nama bulan singkat untuk grid
     'Jan', 'Feb', 'Mar', 'Apr',
     'Mei', 'Jun', 'Jul', 'Agu',
     'Sep', 'Okt', 'Nov', 'Des',
   ];
 
-  static const List<String> _namaPanjang = [
+  static const List<String> _namaPanjang = [ // nama bulan lengkap untuk label semantik
     'Januari', 'Februari', 'Maret', 'April',
     'Mei', 'Juni', 'Juli', 'Agustus',
     'September', 'Oktober', 'November', 'Desember',
@@ -914,8 +917,8 @@ class _MonthPickerDialogState extends State<_MonthPickerDialog> {
   @override
   void initState() {
     super.initState();
-    _tahun = widget.initialDate.year;
-    _bulan = widget.initialDate.month;
+    _tahun = widget.initialDate.year; // set tahun awal dari parameter
+    _bulan = widget.initialDate.month; // set bulan awal dari parameter
 
     // Dialog ini muncul di atas fokus TalkBack sebelumnya tanpa
     // konteks apa pun — tanpa pengumuman ini, fokus otomatis jatuh ke
@@ -923,9 +926,9 @@ class _MonthPickerDialogState extends State<_MonthPickerDialog> {
     // diberi tahu bulan/tahun apa yang sedang ditampilkan.
     // addPostFrameCallback dipakai karena View.of(context) baru valid
     // setelah frame pertama dialog ini selesai dirender.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      SemanticsService.sendAnnouncement(
+    WidgetsBinding.instance.addPostFrameCallback((_) { // jalankan setelah frame pertama selesai dirender
+      if (!mounted) return; // batalkan jika widget sudah dilepas
+      SemanticsService.sendAnnouncement( // umumkan bulan/tahun aktif ke pembaca layar
         View.of(context),
         'Pilih bulan. Saat ini menampilkan ${_namaPanjang[_bulan - 1]} $_tahun.',
         Directionality.of(context),
@@ -935,29 +938,29 @@ class _MonthPickerDialogState extends State<_MonthPickerDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final int tahunSekarang = DateTime.now().year;
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    final int tahunSekarang = DateTime.now().year; // tahun sekarang, batas atas navigasi tahun
+    return Dialog( // bungkus konten sebagai dialog modal
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), // sudut dialog membulat
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: MainAxisSize.min, // tinggi seminimal isinya
           children: [
             // Navigator tahun
-            Row(
+            Row( // baris navigasi ganti tahun
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                IconButton(
+                IconButton( // tombol tahun sebelumnya
                   icon: const Icon(Icons.chevron_left_rounded),
-                  onPressed: () => setState(() => _tahun--),
+                  onPressed: () => setState(() => _tahun--), // kurangi tahun
                   tooltip: 'Tahun sebelumnya',
                 ),
                 Semantics(
-                  header: true,
+                  header: true, // tandai sebagai header bagi pembaca layar
                   label: 'Tahun $_tahun',
                   excludeSemantics: true,
                   child: Text(
-                    '$_tahun',
+                    '$_tahun', // tampilkan tahun aktif
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
@@ -965,46 +968,46 @@ class _MonthPickerDialogState extends State<_MonthPickerDialog> {
                     ),
                   ),
                 ),
-                IconButton(
+                IconButton( // tombol tahun berikutnya
                   icon: const Icon(Icons.chevron_right_rounded),
-                  onPressed: _tahun < tahunSekarang
-                      ? () => setState(() => _tahun++)
+                  onPressed: _tahun < tahunSekarang // hanya aktif jika belum tahun sekarang
+                      ? () => setState(() => _tahun++) // tambah tahun
                       : null,
                   tooltip: 'Tahun berikutnya',
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 12), // jarak vertikal
 
             // Grid bulan
-            GridView.count(
-              crossAxisCount: 4,
-              shrinkWrap: true,
+            GridView.count( // grid 12 bulan
+              crossAxisCount: 4, // 4 kolom
+              shrinkWrap: true, // tinggi menyesuaikan isi
               mainAxisSpacing: 8,
               crossAxisSpacing: 8,
-              childAspectRatio: 1.4,
-              children: List.generate(12, (i) {
-                final int b = i + 1;
-                final bool dipilih = b == _bulan;
+              childAspectRatio: 1.4, // rasio lebar:tinggi tiap sel
+              children: List.generate(12, (i) { // buat 12 tombol bulan
+                final int b = i + 1; // nomor bulan 1-12
+                final bool dipilih = b == _bulan; // apakah bulan ini sedang dipilih
                 return Semantics(
                   button: true,
                   selected: dipilih,
-                  label: '${_namaPanjang[i]}${dipilih ? ', dipilih' : ''}',
-                  onTap: () => setState(() => _bulan = b),
+                  label: '${_namaPanjang[i]}${dipilih ? ', dipilih' : ''}', // label sesuai status pilih
+                  onTap: () => setState(() => _bulan = b), // pilih bulan ini
                   excludeSemantics: true,
                   child: InkWell(
-                    onTap: () => setState(() => _bulan = b),
+                    onTap: () => setState(() => _bulan = b), // pilih bulan ini
                     borderRadius: BorderRadius.circular(10),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: dipilih
+                        color: dipilih // warna latar sesuai status pilih
                             ? Theme.of(context).colorScheme.primary
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       alignment: Alignment.center,
                       child: Text(
-                        _singkat[i],
+                        _singkat[i], // teks nama bulan singkat
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -1018,23 +1021,23 @@ class _MonthPickerDialogState extends State<_MonthPickerDialog> {
                 );
               }),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 16), // jarak vertikal
 
             // Tombol aksi
-            Row(
+            Row( // baris tombol Batal & Pilih
               children: [
                 Expanded(
-                  child: TextButton(
-                    onPressed: () => Navigator.pop(context),
+                  child: TextButton( // tombol batal
+                    onPressed: () => Navigator.pop(context), // tutup dialog tanpa hasil
                     child: Text(
                       'Batal',
                       style: TextStyle(color: context.warnaTeksMuted),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 8), // jarak horizontal
                 Expanded(
-                  child: ElevatedButton(
+                  child: ElevatedButton( // tombol konfirmasi pilih
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Theme.of(context).colorScheme.primary,
                       foregroundColor: Theme.of(context).colorScheme.onPrimary,
@@ -1042,7 +1045,7 @@ class _MonthPickerDialogState extends State<_MonthPickerDialog> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                    onPressed: () =>
+                    onPressed: () => // kembalikan tanggal terpilih ke pemanggil
                         Navigator.pop(context, DateTime(_tahun, _bulan)),
                     child: const Text('Pilih'),
                   ),

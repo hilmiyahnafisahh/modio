@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
-import '../../../../core/theme/app_colors.dart';
+import 'package:flutter/material.dart'; // Widget-widget dasar Flutter (Material Design)
+import '../../../../core/theme/app_colors.dart'; // Palet warna aplikasi
 
 /// ─────────────────────────────────────────────────────────────────
 /// AI ANOMALY BADGE  –  Badge peringatan anomali transaksi dari AI
@@ -13,47 +13,47 @@ import '../../../../core/theme/app_colors.dart';
 ///   )
 /// ─────────────────────────────────────────────────────────────────
 
-class AiAnomalyBadge extends StatelessWidget {
+class AiAnomalyBadge extends StatelessWidget { // Widget badge peringatan, tanpa state internal
   /// Pesan anomali dari AI
-  final String message;
+  final String message; // Teks pesan peringatan yang ditampilkan
 
   /// Level keparahan: 'warning' (kuning) atau 'alert' (merah)
-  final AnomalyLevel level;
+  final AnomalyLevel level; // Tingkat keparahan anomali
 
-  const AiAnomalyBadge({
-    super.key,
-    required this.message,
-    this.level = AnomalyLevel.warning,
+  const AiAnomalyBadge({ // Konstruktor widget
+    super.key, // Key diteruskan ke superclass
+    required this.message, // Wajib diisi
+    this.level = AnomalyLevel.warning, // Default level peringatan ringan
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) { // Membangun tampilan badge
     final Color bgColor = level == AnomalyLevel.alert
-        ? AppColors.tertiary50
+        ? AppColors.tertiary50 // Latar merah muda untuk level alert
         : const Color(0xFFFFFBEB); // amber muda
     final Color iconColor = level == AnomalyLevel.alert
-        ? AppColors.tertiary500
+        ? AppColors.tertiary500 // Warna merah untuk level alert
         : const Color(0xFFB45309); // amber gelap
     final IconData icon = level == AnomalyLevel.alert
-        ? Icons.error_outline
-        : Icons.warning_amber_outlined;
+        ? Icons.error_outline // Ikon error untuk level alert
+        : Icons.warning_amber_outlined; // Ikon peringatan untuk level warning
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    return Container( // Kotak pembungkus badge
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), // Jarak isi dari tepi
       decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(8),
+        color: bgColor, // Warna latar sesuai level
+        borderRadius: BorderRadius.circular(8), // Sudut membulat
         border: Border.all(
           color: iconColor.withAlpha(77), // 30% opacity border
           width: 1,
         ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Row( // Susun ikon dan teks pesan secara horizontal
+        mainAxisSize: MainAxisSize.min, // Lebar mengikuti konten, tidak memaksa penuh
         children: [
-          Icon(icon, size: 16, color: iconColor),
-          const SizedBox(width: 6),
-          Flexible(
+          Icon(icon, size: 16, color: iconColor), // Ikon penanda level keparahan
+          const SizedBox(width: 6), // Jarak horizontal ikon ke teks
+          Flexible( // Teks bisa menyusut sesuai ruang tersedia
             child: Text(
               message,
               style: TextStyle(
@@ -70,7 +70,7 @@ class AiAnomalyBadge extends StatelessWidget {
 }
 
 /// Level keparahan anomali
-enum AnomalyLevel {
+enum AnomalyLevel { // Tingkat keparahan pesan anomali
   warning, // Peringatan ringan (kuning)
   alert,   // Peringatan serius (merah)
 }

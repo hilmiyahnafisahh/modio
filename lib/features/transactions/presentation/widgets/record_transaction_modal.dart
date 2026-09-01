@@ -1,15 +1,15 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/material.dart'; // widget dan tema dasar Flutter
+import 'package:flutter/semantics.dart'; // untuk pengumuman ke pembaca layar
+import 'package:flutter/services.dart'; // untuk pembatas input (FilteringTextInputFormatter)
 
-import '../../../../core/navigation/app_route.dart';
-import '../../../../core/theme/app_typography.dart';
-import '../../../../core/theme/theme_extensions.dart';
-import '../../../../core/utils/currency_formatter.dart';
-import '../../data/transaction_model.dart';
-import '../../data/transaksi_repository.dart';
-import '../pages/category_picker_page.dart';
-import 'voice_transaction_flow.dart';
+import '../../../../core/navigation/app_route.dart'; // helper pembuat rute navigasi
+import '../../../../core/theme/app_typography.dart'; // gaya teks standar aplikasi
+import '../../../../core/theme/theme_extensions.dart'; // ekstensi warna kontekstual (mis. context.warnaKartu)
+import '../../../../core/utils/currency_formatter.dart'; // pengubah angka jadi teks rupiah/lisan
+import '../../data/transaction_model.dart'; // model data transaksi dan jenisnya
+import '../../data/transaksi_repository.dart'; // sumber data transaksi (simpan/baca/perbarui)
+import '../pages/category_picker_page.dart'; // halaman pemilih kategori
+import 'voice_transaction_flow.dart'; // fungsi pengenalan ucapan untuk transaksi
 
 class RecordTransactionModal extends StatefulWidget {
   /// Transaksi yang sedang diedit. Null berarti form ini untuk
@@ -38,65 +38,65 @@ class RecordTransactionModal extends StatefulWidget {
 }
 
 class _RecordTransactionModalState extends State<RecordTransactionModal> {
-  final _repo = TransaksiRepository();
+  final _repo = TransaksiRepository(); // akses data transaksi (simpan, perbarui, baca kategori)
 
   // Controller diperlukan agar nilai yang diketik bisa dibaca.
   // Tanpa ini, TextField hanya tampilan — isinya tidak bisa diambil.
-  final _nominalCtrl = TextEditingController();
-  final _keteranganCtrl = TextEditingController();
+  final _nominalCtrl = TextEditingController(); // pengendali isi kolom nominal
+  final _keteranganCtrl = TextEditingController(); // pengendali isi kolom keterangan
 
-  bool _isIncome = true;
-  String _metode = 'tunai';
-  String? _kategori;
-  DateTime _tanggal = DateTime.now();
-  List<String> _daftarKategori = [];
-  bool _menyimpan = false;
+  bool _isIncome = true; // true jika transaksi berupa pemasukan
+  String _metode = 'tunai'; // metode pembayaran yang dipilih
+  String? _kategori; // kategori transaksi yang dipilih
+  DateTime _tanggal = DateTime.now(); // tanggal transaksi, default hari ini
+  List<String> _daftarKategori = []; // daftar kategori tersedia untuk jenis transaksi saat ini
+  bool _menyimpan = false; // true selama proses penyimpanan berlangsung
 
-  bool get _modeEdit => widget.existingItem != null;
+  bool get _modeEdit => widget.existingItem != null; // true jika form ini untuk mengedit transaksi lama
 
   TransactionType get _type =>
-      _isIncome ? TransactionType.masuk : TransactionType.keluar;
+      _isIncome ? TransactionType.masuk : TransactionType.keluar; // jenis transaksi sesuai sakelar pemasukan/pengeluaran
 
   /// Nominal mentah, titik dan spasi dibuang.
   int? get _nominal {
-    final bersih = _nominalCtrl.text.replaceAll(RegExp(r'\D'), '');
-    return bersih.isEmpty ? null : int.tryParse(bersih);
+    final bersih = _nominalCtrl.text.replaceAll(RegExp(r'\D'), ''); // buang semua karakter selain digit
+    return bersih.isEmpty ? null : int.tryParse(bersih); // null bila kosong, angka bila ada isi
   }
 
   @override
   void initState() {
     super.initState();
 
-    final TransactionItem? existing = widget.existingItem;
+    final TransactionItem? existing = widget.existingItem; // transaksi lama bila sedang mode edit
     if (existing != null) {
-      _isIncome = existing.type == TransactionType.masuk;
-      _nominalCtrl.text = existing.nominal.toString();
+      _isIncome = existing.type == TransactionType.masuk; // isi jenis dari data lama
+      _nominalCtrl.text = existing.nominal.toString(); // isi nominal dari data lama
       // catatan dan title diisi dari sumber yang sama saat menyimpan
       // (lihat _simpan): kalau keterangan kosong, title diambil dari
       // nama kategori dan catatan disimpan null. Jadi merekonstruksi
       // isian keterangan yang asli cukup dari catatan saja.
-      _keteranganCtrl.text = existing.catatan ?? '';
-      _metode = existing.method;
-      _kategori = existing.kategori;
-      _tanggal = existing.occurredAt.toLocal();
+      _keteranganCtrl.text = existing.catatan ?? ''; // isi keterangan dari catatan lama
+      _metode = existing.method; // isi metode bayar dari data lama
+      _kategori = existing.kategori; // isi kategori dari data lama
+      _tanggal = existing.occurredAt.toLocal(); // isi tanggal dari data lama, dikonversi ke waktu lokal
     } else {
-      if (widget.prefillIsIncome != null) _isIncome = widget.prefillIsIncome!;
+      if (widget.prefillIsIncome != null) _isIncome = widget.prefillIsIncome!; // pakai hasil suara bila ada
       if (widget.prefillNominal != null) {
-        _nominalCtrl.text = widget.prefillNominal.toString();
+        _nominalCtrl.text = widget.prefillNominal.toString(); // isi nominal dari hasil suara
       }
       if (widget.prefillCatatan != null && widget.prefillCatatan!.isNotEmpty) {
-        _keteranganCtrl.text = widget.prefillCatatan!;
+        _keteranganCtrl.text = widget.prefillCatatan!; // isi keterangan dari hasil suara
       }
-      _kategori = widget.prefillKategori;
+      _kategori = widget.prefillKategori; // isi kategori dari hasil suara bila ada
     }
 
-    _muatKategoriAwal();
+    _muatKategoriAwal(); // muat daftar kategori sesuai jenis transaksi saat ini
   }
 
   @override
   void dispose() {
-    _nominalCtrl.dispose();
-    _keteranganCtrl.dispose();
+    _nominalCtrl.dispose(); // lepas controller nominal agar tidak bocor memori
+    _keteranganCtrl.dispose(); // lepas controller keterangan agar tidak bocor memori
     super.dispose();
   }
 
@@ -107,11 +107,11 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
   /// apa adanya — halaman pemilih kategori menampilkannya persis
   /// seperti tersimpan, tidak diam-diam diganti.
   Future<void> _muatKategoriAwal() async {
-    final daftar = await _repo.kategoriUntuk(_type);
-    if (!mounted) return;
+    final daftar = await _repo.kategoriUntuk(_type); // ambil daftar kategori dari repository
+    if (!mounted) return; // batalkan bila widget sudah dilepas
     setState(() {
-      _daftarKategori = daftar;
-      _kategori ??= daftar.isNotEmpty ? daftar.first : null;
+      _daftarKategori = daftar; // perbarui daftar kategori yang tampil
+      _kategori ??= daftar.isNotEmpty ? daftar.first : null; // isi kategori hanya jika belum ada nilai
     });
   }
 
@@ -119,11 +119,11 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
   /// dipakai saat pengguna mengganti jenis Pemasukan/Pengeluaran,
   /// sebab kategori lama sudah pasti tidak berlaku untuk jenis baru.
   Future<void> _muatKategori() async {
-    final daftar = await _repo.kategoriUntuk(_type);
-    if (!mounted) return;
+    final daftar = await _repo.kategoriUntuk(_type); // ambil daftar kategori sesuai jenis baru
+    if (!mounted) return; // batalkan bila widget sudah dilepas
     setState(() {
-      _daftarKategori = daftar;
-      _kategori = daftar.isNotEmpty ? daftar.first : null;
+      _daftarKategori = daftar; // perbarui daftar kategori
+      _kategori = daftar.isNotEmpty ? daftar.first : null; // selalu reset ke kategori pertama
     });
   }
 
@@ -135,12 +135,12 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
             type: _type,
             kategoriTerpilih: _kategori,
           )),
-    );
-    if (hasil == null || !mounted) return;
+    ); // tunggu kategori yang dipilih pengguna dari halaman lain
+    if (hasil == null || !mounted) return; // batalkan bila dibatalkan atau widget sudah dilepas
     setState(() {
-      _kategori = hasil;
+      _kategori = hasil; // terapkan kategori baru yang dipilih
       if (!_daftarKategori.contains(hasil)) {
-        _daftarKategori = [..._daftarKategori, hasil];
+        _daftarKategori = [..._daftarKategori, hasil]; // tambahkan kategori baru ke daftar bila belum ada
       }
     });
     // Perubahan status diumumkan — pengguna tunanetra tidak melihat
@@ -155,13 +155,13 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
   Future<void> _pilihTanggal() async {
     final hasil = await showDatePicker(
       context: context,
-      initialDate: _tanggal,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
+      initialDate: _tanggal, // tanggal awal yang ditampilkan di kalender
+      firstDate: DateTime(2020), // batas tanggal paling lama yang bisa dipilih
+      lastDate: DateTime.now(), // batas tanggal paling baru yang bisa dipilih
       helpText: 'Pilih tanggal transaksi',
     );
     if (hasil != null && mounted) {
-      setState(() => _tanggal = hasil);
+      setState(() => _tanggal = hasil); // terapkan tanggal yang dipilih
     }
   }
 
@@ -172,10 +172,10 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
   /// utuh yang mengulang seluruh isian adalah satu-satunya cara ia bisa
   /// memverifikasi sendiri, tanpa bertanya ke orang lain.
   Future<bool> _konfirmasi() async {
-    final n = _nominal!;
-    final arah = _isIncome ? 'Uang masuk' : 'Uang keluar';
+    final n = _nominal!; // nominal sudah dipastikan tidak null oleh pemanggil
+    final arah = _isIncome ? 'Uang masuk' : 'Uang keluar'; // kalimat arah transaksi
     final kalimat = '$arah ${CurrencyFormatter.spoken(n)}, '
-        '$_kategori, $_metode, ${DateFormatter.full(_tanggal)}';
+        '$_kategori, $_metode, ${DateFormatter.full(_tanggal)}'; // rangkai kalimat konfirmasi lengkap
 
     final hasil = await showDialog<bool>(
       context: context,
@@ -196,7 +196,7 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
         actionsOverflowButtonSpacing: 12,
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(context, false), // tutup dialog, kembalikan hasil false (batal)
             style: TextButton.styleFrom(
               minimumSize: const Size(120, 56),
               textStyle: const TextStyle(
@@ -207,7 +207,7 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
             child: const Text('Perbaiki'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(context, true), // tutup dialog, kembalikan hasil true (setuju)
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.primary,
               foregroundColor: Theme.of(context).colorScheme.onPrimary,
@@ -222,7 +222,7 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
         ],
       ),
     );
-    return hasil ?? false;
+    return hasil ?? false; // anggap batal bila dialog ditutup tanpa memilih
   }
 
   Future<void> _simpan() async {
@@ -230,21 +230,21 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
     // kalimat konfirmasi yang isinya salah.
     final n = _nominal;
     if (n == null || n <= 0) {
-      _pesan('Nominal belum diisi. Masukkan angka lebih dari nol.');
+      _pesan('Nominal belum diisi. Masukkan angka lebih dari nol.'); // tolak nominal kosong/tidak valid
       return;
     }
     if (n > 100000000) {
-      _pesan('Nominal terlalu besar. Periksa kembali jumlah nolnya.');
+      _pesan('Nominal terlalu besar. Periksa kembali jumlah nolnya.'); // tolak nominal yang tidak masuk akal
       return;
     }
     if (_kategori == null) {
-      _pesan('Kategori belum dipilih.');
+      _pesan('Kategori belum dipilih.'); // tolak bila kategori belum dipilih
       return;
     }
 
-    if (!await _konfirmasi()) return;
+    if (!await _konfirmasi()) return; // hentikan bila pengguna memilih "Perbaiki"
 
-    setState(() => _menyimpan = true);
+    setState(() => _menyimpan = true); // tampilkan status sedang menyimpan
     // Judul transaksi SELALU nama kategori — sebelumnya keterangan
     // yang diisi malah menggantikan judul (mengetik "Pak Ahmad" di
     // Keterangan membuat itu jadi judul, dan kategori terdesak jadi
@@ -252,10 +252,10 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
     // judul pengganti.
     final String title = _kategori!;
     final String? catatanBaru =
-        _keteranganCtrl.text.trim().isEmpty ? null : _keteranganCtrl.text.trim();
+        _keteranganCtrl.text.trim().isEmpty ? null : _keteranganCtrl.text.trim(); // null bila keterangan kosong
 
     try {
-      String narasiHasil;
+      String narasiHasil; // kalimat yang akan diumumkan setelah berhasil
       if (_modeEdit) {
         await _repo.perbarui(
           id: widget.existingItem!.id,
@@ -282,11 +282,11 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
           kategori: _kategori!,
           catatan: catatanBaru,
           waktu: _tanggal,
-        );
+        ); // simpan transaksi baru ke repository
         narasiHasil = 'Tersimpan. ${transaksi.narasi}';
       }
 
-      if (!mounted) return;
+      if (!mounted) return; // batalkan bila widget sudah dilepas selama proses async
 
       // Diumumkan lewat sistem aksesibilitas, bukan hanya snackbar.
       // Snackbar hilang dalam empat detik dan sering terlewat TalkBack.
@@ -295,10 +295,10 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
         narasiHasil,
         Directionality.of(context),
       );
-      Navigator.pop(context, true);
+      Navigator.pop(context, true); // tutup modal, beri tahu pemanggil bahwa berhasil
     } catch (e) {
-      if (!mounted) return;
-      setState(() => _menyimpan = false);
+      if (!mounted) return; // batalkan bila widget sudah dilepas
+      setState(() => _menyimpan = false); // kembalikan status agar tombol simpan bisa dicoba lagi
       _pesan('Transaksi belum tersimpan. Periksa isian lalu coba lagi.');
     }
   }
@@ -309,29 +309,29 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
   /// pengguna sudah berada di dalam form, jadi hasilnya menimpa isian
   /// yang sudah ada alih-alih membuka form kedua di atasnya.
   Future<void> _pakaiSuara() async {
-    final String? teks = await dengarkanUcapan(context);
-    if (teks == null || teks.trim().isEmpty || !mounted) return;
+    final String? teks = await dengarkanUcapan(context); // rekam dan ubah ucapan jadi teks
+    if (teks == null || teks.trim().isEmpty || !mounted) return; // batalkan bila tidak ada hasil
 
-    final hasil = await uraikanUcapanTransaksi(context, teks);
-    if (hasil == null || !mounted) return;
+    final hasil = await uraikanUcapanTransaksi(context, teks); // uraikan teks jadi data transaksi lewat AI
+    if (hasil == null || !mounted) return; // batalkan bila gagal diuraikan
 
     setState(() {
-      if (hasil.jenis == 'masuk') _isIncome = true;
-      if (hasil.jenis == 'keluar') _isIncome = false;
+      if (hasil.jenis == 'masuk') _isIncome = true; // terapkan jenis pemasukan bila terdeteksi
+      if (hasil.jenis == 'keluar') _isIncome = false; // terapkan jenis pengeluaran bila terdeteksi
       if (hasil.nominal != null) {
-        _nominalCtrl.text = hasil.nominal.toString();
+        _nominalCtrl.text = hasil.nominal.toString(); // isi nominal dari hasil pengenalan suara
       }
       if (hasil.catatan.isNotEmpty) {
-        _keteranganCtrl.text = hasil.catatan;
+        _keteranganCtrl.text = hasil.catatan; // isi keterangan dari hasil pengenalan suara
       }
-      if (hasil.kategori != null) _kategori = hasil.kategori;
+      if (hasil.kategori != null) _kategori = hasil.kategori; // isi kategori dari hasil pengenalan suara
     });
     // Memuat ulang daftar kategori untuk jenis (masuk/keluar) yang
     // mungkin baru saja berubah — _kategori sudah diisi di atas jadi
     // tidak akan tertimpa balik ke kategori pertama.
     await _muatKategoriAwal();
 
-    if (!mounted) return;
+    if (!mounted) return; // batalkan bila widget sudah dilepas
     SemanticsService.sendAnnouncement(
       View.of(context),
       'Isian terisi dari suara. Periksa sebelum menyimpan.',
@@ -343,7 +343,7 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(teks, style: const TextStyle(fontSize: 16)),
-        duration: const Duration(seconds: 5),
+        duration: const Duration(seconds: 5), // durasi tampil snackbar lebih lama dari bawaan
       ),
     );
   }
@@ -356,11 +356,11 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
           left: 20,
           right: 20,
           top: 18,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20, // tambah jarak bawah saat keyboard muncul
         ),
         decoration: BoxDecoration(
           color: context.warnaKartu,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)), // sudut atas membulat, seperti bottom sheet
         ),
         child: SingleChildScrollView(
           child: Column(
@@ -374,7 +374,7 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
                     color: context.warnaGaris,
                     borderRadius: BorderRadius.circular(2),
                   ),
-                ),
+                ), // gagang kecil penanda visual bahwa ini bisa digeser/ditutup
               ),
               const SizedBox(height: 14),
 
@@ -388,7 +388,7 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
                       minHeight: 48,
                     ),
                     padding: EdgeInsets.zero,
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => Navigator.pop(context), // tutup modal tanpa menyimpan
                     tooltip: 'Tutup',
                     icon: Icon(
                       Icons.chevron_left,
@@ -398,7 +398,7 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    _modeEdit ? 'Edit Transaksi' : 'Input Transaksi',
+                    _modeEdit ? 'Edit Transaksi' : 'Input Transaksi', // judul berubah sesuai mode
                     style: AppTypography.titleLarge.copyWith(
                       color: context.warnaTeksUtama,
                     ),
@@ -421,8 +421,8 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
                       bgColor: context.latarMasuk,
                       iconColor: context.warnaMasuk,
                       onTap: () {
-                        setState(() => _isIncome = true);
-                        _muatKategori();
+                        setState(() => _isIncome = true); // pilih jenis pemasukan
+                        _muatKategori(); // muat ulang kategori sesuai jenis baru
                       },
                     ),
                   ),
@@ -435,8 +435,8 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
                       bgColor: context.latarKeluar,
                       iconColor: context.warnaKeluar,
                       onTap: () {
-                        setState(() => _isIncome = false);
-                        _muatKategori();
+                        setState(() => _isIncome = false); // pilih jenis pengeluaran
+                        _muatKategori(); // muat ulang kategori sesuai jenis baru
                       },
                     ),
                   ),
@@ -453,7 +453,7 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
                 onTap: _pilihTanggal,
                 excludeSemantics: true,
                 child: InkWell(
-                  onTap: _pilihTanggal,
+                  onTap: _pilihTanggal, // buka kalender pemilih tanggal
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     constraints: const BoxConstraints(minHeight: 56),
@@ -471,7 +471,7 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
                         ),
                         const SizedBox(width: 12),
                         Text(
-                          DateFormatter.full(_tanggal),
+                          DateFormatter.full(_tanggal), // tampilkan tanggal terpilih dalam format lengkap
                           style: TextStyle(
                             fontSize: 16,
                             color: context.warnaTeksUtama,
@@ -488,9 +488,9 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
               const SizedBox(height: 8),
               TextField(
                 controller: _nominalCtrl,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                onChanged: (_) => setState(() {}),
+                keyboardType: TextInputType.number, // munculkan keyboard angka
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly], // hanya izinkan digit diketik
+                onChanged: (_) => setState(() {}), // bangun ulang agar teks lisan di bawah ikut diperbarui
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w600,
@@ -507,9 +507,9 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
               if (_nominal != null && _nominal! > 0) ...[
                 const SizedBox(height: 10),
                 Semantics(
-                  liveRegion: true,
+                  liveRegion: true, // area yang otomatis diumumkan ulang saat isinya berubah
                   child: Text(
-                    CurrencyFormatter.spoken(_nominal!),
+                    CurrencyFormatter.spoken(_nominal!), // nominal dalam bentuk kata-kata terucap
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -533,7 +533,7 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
                 labelSemantik: 'Kategori, ${_kategori ?? "belum dipilih"}. '
                     'Ketuk untuk mengubah',
                 ikon: Icons.category_outlined,
-                onTap: _pilihKategori,
+                onTap: _pilihKategori, // buka halaman pemilih kategori
               ),
 
               const SizedBox(height: 16),
@@ -561,7 +561,7 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
                       label: 'Tunai',
                       icon: Icons.account_balance_wallet_outlined,
                       isSelected: _metode == 'tunai',
-                      onTap: () => setState(() => _metode = 'tunai'),
+                      onTap: () => setState(() => _metode = 'tunai'), // pilih metode tunai
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -570,7 +570,7 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
                       label: 'Non Tunai',
                       icon: Icons.credit_card_outlined,
                       isSelected: _metode == 'non tunai',
-                      onTap: () => setState(() => _metode = 'non tunai'),
+                      onTap: () => setState(() => _metode = 'non tunai'), // pilih metode non tunai
                     ),
                   ),
                 ],
@@ -583,7 +583,7 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
                 onTap: _pakaiSuara,
                 excludeSemantics: true,
                 child: InkWell(
-                  onTap: _pakaiSuara,
+                  onTap: _pakaiSuara, // mulai pengenalan suara dan isi form otomatis
                   borderRadius: BorderRadius.circular(14),
                   child: Container(
                     width: double.infinity,
@@ -638,7 +638,7 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _menyimpan ? null : _simpan,
+                  onPressed: _menyimpan ? null : _simpan, // nonaktifkan tombol selagi sedang menyimpan
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.primary,
                     foregroundColor: Theme.of(context).colorScheme.onPrimary,
@@ -654,7 +654,7 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
                   child: Text(
                     _menyimpan
                         ? 'Menyimpan...'
-                        : (_modeEdit ? 'Simpan Perubahan' : 'Simpan Transaksi'),
+                        : (_modeEdit ? 'Simpan Perubahan' : 'Simpan Transaksi'), // label tombol sesuai status/mode
                     style: const TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w700,
@@ -694,7 +694,7 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
       hintText: hintText,
       hintStyle: TextStyle(
         color: context.warnaTeksMuted,
-        fontSize: besar ? 17 : 16,
+        fontSize: besar ? 17 : 16, // ukuran hint menyesuaikan mode besar
       ),
       prefixText: prefixText,
       prefixStyle: TextStyle(
@@ -706,7 +706,7 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
       fillColor: context.warnaKartu,
       contentPadding: EdgeInsets.symmetric(
         horizontal: 14,
-        vertical: besar ? 20 : 16,
+        vertical: besar ? 20 : 16, // padding vertikal lebih besar pada mode besar
       ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -730,12 +730,12 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
 }
 
 class _TypeCard extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool isSelected;
-  final Color bgColor;
-  final Color iconColor;
-  final VoidCallback onTap;
+  final String label; // teks yang ditampilkan pada kartu
+  final IconData icon; // ikon arah (masuk/keluar)
+  final bool isSelected; // true bila kartu ini sedang aktif dipilih
+  final Color bgColor; // warna latar saat terpilih
+  final Color iconColor; // warna ikon dan garis tepi saat terpilih
+  final VoidCallback onTap; // aksi saat kartu diketuk
 
   const _TypeCard({
     required this.label,
@@ -761,7 +761,7 @@ class _TypeCard extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: 64),
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
           decoration: BoxDecoration(
-            color: isSelected ? bgColor : context.warnaKartu,
+            color: isSelected ? bgColor : context.warnaKartu, // latar berubah saat terpilih
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: isSelected ? iconColor : context.warnaGaris,
@@ -795,10 +795,10 @@ class _TypeCard extends StatelessWidget {
 }
 
 class _PaymentOption extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool isSelected;
-  final VoidCallback onTap;
+  final String label; // teks metode pembayaran
+  final IconData icon; // ikon metode pembayaran
+  final bool isSelected; // true bila opsi ini sedang aktif dipilih
+  final VoidCallback onTap; // aksi saat opsi diketuk
 
   const _PaymentOption({
     required this.label,
@@ -865,10 +865,10 @@ class _PaymentOption extends StatelessWidget {
 /// Baris yang membuka halaman pemilih (mis. kategori) — pengganti pola
 /// dropdown/kolom teks yang bermasalah dengan pembaca layar.
 class _BarisPilihan extends StatelessWidget {
-  final String nilai;
-  final String labelSemantik;
-  final IconData ikon;
-  final VoidCallback onTap;
+  final String nilai; // teks nilai yang sedang terpilih
+  final String labelSemantik; // teks lengkap yang dibacakan pembaca layar
+  final IconData ikon; // ikon di sisi kiri baris
+  final VoidCallback onTap; // aksi saat baris diketuk
 
   const _BarisPilihan({
     required this.nilai,

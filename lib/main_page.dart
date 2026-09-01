@@ -1,19 +1,19 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart'; // Widget dan tema dasar Flutter
 
-import 'core/navigation/app_route.dart';
-import 'core/navigation/main_nav_controller.dart';
-import 'core/theme/app_colors.dart';
-import 'core/theme/theme_extensions.dart';
-import 'features/ai_chat/presentation/pages/ai_assistant_page.dart';
-import 'features/dashboard/presentation/pages/dashboard_page.dart';
-import 'features/transactions/presentation/pages/history_page.dart';
-import 'features/transactions/presentation/widgets/record_transaction_modal.dart';
-import 'features/reports/presentation/pages/reports_page.dart';
-import 'features/profile/presentation/pages/profile_page.dart';
-import 'features/profile/presentation/pages/informasi_profil_page.dart';
-import 'features/profile/presentation/pages/ganti_pin_page.dart';
-import 'features/profile/presentation/pages/pengaturan_aksesibilitas_page.dart';
-import 'features/profile/presentation/pages/tentang_aplikasi_page.dart';
+import 'core/navigation/app_route.dart'; // Helper pembuat route/transisi halaman
+import 'core/navigation/main_nav_controller.dart'; // Pengontrol tab navigasi utama & navigasi suara
+import 'core/theme/app_colors.dart'; // Palet warna khusus aplikasi
+import 'core/theme/theme_extensions.dart'; // Extension context.warnaXxx untuk warna sesuai tema
+import 'features/ai_chat/presentation/pages/ai_assistant_page.dart'; // Halaman chat AI
+import 'features/dashboard/presentation/pages/dashboard_page.dart'; // Halaman dashboard/beranda
+import 'features/transactions/presentation/pages/history_page.dart'; // Halaman riwayat transaksi
+import 'features/transactions/presentation/widgets/record_transaction_modal.dart'; // Modal catat transaksi
+import 'features/reports/presentation/pages/reports_page.dart'; // Halaman laporan
+import 'features/profile/presentation/pages/profile_page.dart'; // Halaman profil
+import 'features/profile/presentation/pages/informasi_profil_page.dart'; // Halaman informasi profil
+import 'features/profile/presentation/pages/ganti_pin_page.dart'; // Halaman ganti PIN
+import 'features/profile/presentation/pages/pengaturan_aksesibilitas_page.dart'; // Halaman pengaturan aksesibilitas
+import 'features/profile/presentation/pages/tentang_aplikasi_page.dart'; // Halaman tentang aplikasi
 
 /// ─────────────────────────────────────────────────────────────────
 /// MAIN PAGE  –  Shell navigasi utama aplikasi
@@ -23,10 +23,10 @@ import 'features/profile/presentation/pages/tentang_aplikasi_page.dart';
 /// membuka modal.
 /// ─────────────────────────────────────────────────────────────────
 
-class _NavItem {
-  final IconData activeIcon;
-  final IconData inactiveIcon;
-  final String label;
+class _NavItem { // Data satu item pada bottom navigation bar
+  final IconData activeIcon; // Ikon saat tab ini aktif
+  final IconData inactiveIcon; // Ikon saat tab ini tidak aktif
+  final String label; // Teks label di bawah ikon
 
   const _NavItem({
     required this.activeIcon,
@@ -35,37 +35,37 @@ class _NavItem {
   });
 }
 
-class MainPage extends StatefulWidget {
+class MainPage extends StatefulWidget { // Widget shell utama, punya state karena tab bisa berubah
   const MainPage({super.key});
 
   @override
-  State<MainPage> createState() => _MainPageState();
+  State<MainPage> createState() => _MainPageState(); // Buat objek state terkait
 }
 
 class _MainPageState extends State<MainPage> {
-  final MainNavController _nav = MainNavController.instance;
+  final MainNavController _nav = MainNavController.instance; // Ambil instance singleton pengontrol navigasi
 
   /// Dinaikkan setiap kali transaksi baru tersimpan, agar halaman
   /// dimuat ulang dari basis data.
-  int _revisi = 0;
+  int _revisi = 0; // Counter pemicu reload halaman lewat perubahan key
 
   @override
-  void initState() {
+  void initState() { // Dipanggil sekali saat widget pertama dibuat
     super.initState();
     // Diisi supaya perintah navigasi suara ("chat AI", "ganti pin", dst.)
     // dari halaman mana pun bisa membuka halaman lepas ini lewat
     // Navigator, bukan cuma lewat menu/tombol masing-masing.
-    _nav.bukaHalamanLepas = _bukaHalamanLepas;
+    _nav.bukaHalamanLepas = _bukaHalamanLepas; // Daftarkan callback pembuka halaman ke controller
   }
 
   @override
-  void dispose() {
-    _nav.bukaHalamanLepas = null;
+  void dispose() { // Dipanggil saat widget dihancurkan
+    _nav.bukaHalamanLepas = null; // Lepas callback agar tidak memanggil state yang sudah mati
     super.dispose();
   }
 
-  void _bukaHalamanLepas(VoiceNavTarget target) {
-    final WidgetBuilder builder = switch (target) {
+  void _bukaHalamanLepas(VoiceNavTarget target) { // Membuka halaman berdasarkan target navigasi suara
+    final WidgetBuilder builder = switch (target) { // Pilih builder halaman sesuai target
       VoiceNavTarget.aiChat => (_) => const AiAssistantPage(),
       VoiceNavTarget.informasiProfil => (_) => const InformasiProfilPage(),
       VoiceNavTarget.gantiPin => (_) => const GantiPinPage(),
@@ -78,12 +78,12 @@ class _MainPageState extends State<MainPage> {
       VoiceNavTarget.riwayat ||
       VoiceNavTarget.laporan ||
       VoiceNavTarget.profil =>
-        throw StateError('$target seharusnya tidak sampai ke sini'),
+        throw StateError('$target seharusnya tidak sampai ke sini'), // Target tab seharusnya tak lewat sini
     };
-    Navigator.push(context, buatRute(builder));
+    Navigator.push(context, buatRute(builder)); // Dorong halaman baru ke tumpukan navigasi
   }
 
-  static const List<_NavItem> _navItems = [
+  static const List<_NavItem> _navItems = [ // Daftar tetap 5 item bottom nav (termasuk tombol tengah)
     _NavItem(
       activeIcon: Icons.home_rounded,
       inactiveIcon: Icons.home_outlined,
@@ -115,98 +115,98 @@ class _MainPageState extends State<MainPage> {
     ),
   ];
 
-  Future<void> _showRecordModal() async {
-    final bool? tersimpan = await showModalBottomSheet<bool>(
+  Future<void> _showRecordModal() async { // Menampilkan modal catat transaksi
+    final bool? tersimpan = await showModalBottomSheet<bool>( // Tunggu hasil modal (true jika tersimpan)
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const RecordTransactionModal(),
+      isScrollControlled: true, // Modal bisa memenuhi tinggi layar (untuk keyboard)
+      backgroundColor: Colors.transparent, // Latar transparan agar sudut modal terlihat membulat
+      builder: (_) => const RecordTransactionModal(), // Widget modal yang ditampilkan
     );
-    if (tersimpan == true && mounted) {
-      setState(() => _revisi++);
+    if (tersimpan == true && mounted) { // Jika transaksi berhasil disimpan dan widget masih hidup
+      setState(() => _revisi++); // Naikkan revisi agar halaman terkait reload data
     }
   }
 
-  void _openAiChat() {
+  void _openAiChat() { // Membuka halaman chat AI
     Navigator.push(
       context,
-      buatRute((_) => const AiAssistantPage()),
+      buatRute((_) => const AiAssistantPage()), // Dorong halaman AiAssistantPage
     );
   }
 
-  void _goToReports() {
-    _nav.currentIndex.value = 3;
+  void _goToReports() { // Pindah ke tab Laporan
+    _nav.currentIndex.value = 3; // Set index tab aktif ke 3 (Laporan)
   }
 
-  int _bodyIndexForNav(int navIndex) {
-    return navIndex >= 3 ? navIndex - 1 : navIndex;
+  int _bodyIndexForNav(int navIndex) { // Konversi index tab nav ke index body IndexedStack
+    return navIndex >= 3 ? navIndex - 1 : navIndex; // Tab setelah tombol Catat digeser mundur satu
   }
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<int>(
-      valueListenable: _nav.currentIndex,
+    return ValueListenableBuilder<int>( // Bangun ulang saat currentIndex berubah
+      valueListenable: _nav.currentIndex, // Dengarkan perubahan index tab aktif
       builder: (context, currentIndex, _) => Scaffold(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        body: IndexedStack(
-          index: currentIndex == 2 ? 0 : _bodyIndexForNav(currentIndex),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor, // Warna latar sesuai tema
+        body: IndexedStack( // Simpan semua halaman tetap hidup, hanya ganti yang terlihat
+          index: currentIndex == 2 ? 0 : _bodyIndexForNav(currentIndex), // Tombol Catat (2) tetap tampilkan Dashboard
           children: [
             DashboardPage(
-              key: ValueKey('dashboard_$_revisi'),
-              onOpenAiChat: _openAiChat,
-              onOpenReports: _goToReports,
+              key: ValueKey('dashboard_$_revisi'), // Key berubah saat revisi naik, memicu rebuild total
+              onOpenAiChat: _openAiChat, // Callback untuk membuka chat AI dari dashboard
+              onOpenReports: _goToReports, // Callback untuk membuka laporan dari dashboard
             ),
-            HistoryPage(key: ValueKey('history_$_revisi')),
-            ReportsPage(key: ValueKey('reports_$_revisi')),
-            const ProfilePage(),
+            HistoryPage(key: ValueKey('history_$_revisi')), // Halaman riwayat, reload saat revisi berubah
+            ReportsPage(key: ValueKey('reports_$_revisi')), // Halaman laporan, reload saat revisi berubah
+            const ProfilePage(), // Halaman profil, tidak perlu reload dari revisi
           ],
         ),
-        bottomNavigationBar: _buildBottomNav(currentIndex),
+        bottomNavigationBar: _buildBottomNav(currentIndex), // Bangun bilah navigasi bawah
       ),
     );
   }
 
-  Widget _buildBottomNav(int currentIndex) {
-    final Color activeColor = Theme.of(context).colorScheme.primary;
-    final Color inactiveColor = context.warnaTeksMuted;
-    final Color bgColor = context.warnaKartu;
+  Widget _buildBottomNav(int currentIndex) { // Membangun seluruh bilah navigasi bawah
+    final Color activeColor = Theme.of(context).colorScheme.primary; // Warna untuk item aktif
+    final Color inactiveColor = context.warnaTeksMuted; // Warna untuk item tidak aktif
+    final Color bgColor = context.warnaKartu; // Warna latar bilah navigasi
 
     return Container(
       decoration: BoxDecoration(
-        color: bgColor,
+        color: bgColor, // Terapkan warna latar
         border: Border(
-          top: BorderSide(color: context.warnaGaris),
+          top: BorderSide(color: context.warnaGaris), // Garis pemisah tipis di atas bilah
         ),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)), // Sudut atas membulat
       ),
-      child: SafeArea(
+      child: SafeArea( // Hindari area sistem (mis. gesture bar) di bawah
         child: Container(
-          constraints: const BoxConstraints(minHeight: 72),
-          padding: const EdgeInsets.symmetric(vertical: 6),
+          constraints: const BoxConstraints(minHeight: 72), // Tinggi minimum bilah navigasi
+          padding: const EdgeInsets.symmetric(vertical: 6), // Jarak dalam vertikal
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: List.generate(_navItems.length, (i) {
-              final bool isActive = currentIndex == i && i != 2;
-              final _NavItem item = _navItems[i];
+            mainAxisAlignment: MainAxisAlignment.spaceAround, // Sebarkan item secara merata
+            children: List.generate(_navItems.length, (i) { // Bangun tiap item nav dari daftar
+              final bool isActive = currentIndex == i && i != 2; // Aktif jika index cocok, kecuali tombol Catat
+              final _NavItem item = _navItems[i]; // Data item nav saat ini
 
               // ── Tombol Catat (tengah) ──────────────────────────
-              if (i == 2) {
-                return Semantics(
-                  button: true,
-                  label: 'Catat transaksi baru',
+              if (i == 2) { // Perlakuan khusus untuk tombol tengah (Catat)
+                return Semantics( // Bungkus dengan info aksesibilitas kustom
+                  button: true, // Umumkan sebagai tombol ke screen reader
+                  label: 'Catat transaksi baru', // Label yang dibacakan TalkBack
                   // onTap wajib dipasang di simpul semantik ini.
                   // excludeSemantics membuang aksi milik InkWell,
                   // jadi tanpa baris ini TalkBack mengumumkan
                   // "tombol" tapi ketuk dua kali tidak melakukan apa
                   // pun — satu-satunya jalan mencatat transaksi jadi
                   // tidak terjangkau lewat TalkBack.
-                  onTap: _showRecordModal,
-                  excludeSemantics: true,
-                  child: InkWell(
-                    onTap: _showRecordModal,
-                    borderRadius: BorderRadius.circular(14),
+                  onTap: _showRecordModal, // Aksi yang dijalankan lewat aktivasi semantik
+                  excludeSemantics: true, // Sembunyikan semantik anak (InkWell) agar tidak dobel
+                  child: InkWell( // Efek ripple visual saat diketuk
+                    onTap: _showRecordModal, // Aksi sama untuk interaksi sentuh biasa
+                    borderRadius: BorderRadius.circular(14), // Bentuk area ripple mengikuti sudut
                     child: Container(
-                      constraints: const BoxConstraints(
+                      constraints: const BoxConstraints( // Ukuran minimum area sentuh (target aksesibilitas)
                         minWidth: 56,
                         minHeight: 56,
                       ),
@@ -215,14 +215,14 @@ class _MainPageState extends State<MainPage> {
                         vertical: 6,
                       ),
                       child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min, // Tinggi kolom sekecil mungkin
+                        mainAxisAlignment: MainAxisAlignment.center, // Rata tengah vertikal
                         children: [
-                          Container(
+                          Container( // Lingkaran ikon tombol Catat
                             width: 44,
                             height: 44,
                             decoration: BoxDecoration(
-                              gradient: context.gelap
+                              gradient: context.gelap // Pilih gradasi warna sesuai mode tema
                                   ? const LinearGradient(
                                       colors: [
                                         AppColors.darkPrimary,
@@ -239,27 +239,27 @@ class _MainPageState extends State<MainPage> {
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                     ),
-                              shape: BoxShape.circle,
+                              shape: BoxShape.circle, // Bentuk lingkaran penuh
                               boxShadow: [
-                                BoxShadow(
+                                BoxShadow( // Bayangan lembut di bawah lingkaran
                                   color: (context.gelap
                                           ? AppColors.darkPrimary
                                           : AppColors.primary700)
-                                      .withValues(alpha: 0.35),
+                                      .withValues(alpha: 0.35), // Transparansi bayangan
                                   blurRadius: 10,
                                   offset: const Offset(0, 3),
                                 ),
                               ],
                             ),
                             child: Icon(
-                              Icons.add_rounded,
+                              Icons.add_rounded, // Ikon tambah/plus
                               size: 26,
-                              color: Theme.of(context).colorScheme.onPrimary,
+                              color: Theme.of(context).colorScheme.onPrimary, // Warna kontras di atas warna primary
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 4), // Jarak antara ikon dan label teks
                           Text(
-                            'Catat',
+                            'Catat', // Label teks di bawah lingkaran
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
@@ -274,17 +274,17 @@ class _MainPageState extends State<MainPage> {
               }
 
               // ── Tombol navigasi biasa ──────────────────────────
-              return Semantics(
-                button: true,
-                selected: isActive,
-                label: item.label,
-                onTap: () => _nav.currentIndex.value = i,
-                excludeSemantics: true,
-                child: InkWell(
-                  onTap: () => _nav.currentIndex.value = i,
+              return Semantics( // Bungkus tombol nav biasa dengan info aksesibilitas
+                button: true, // Umumkan sebagai tombol
+                selected: isActive, // Beritahu screen reader status terpilih
+                label: item.label, // Label yang dibacakan
+                onTap: () => _nav.currentIndex.value = i, // Aksi lewat aktivasi semantik: pindah tab
+                excludeSemantics: true, // Cegah duplikasi semantik dari InkWell di dalamnya
+                child: InkWell( // Efek ripple untuk interaksi sentuh biasa
+                  onTap: () => _nav.currentIndex.value = i, // Ubah index tab aktif saat diketuk
                   borderRadius: BorderRadius.circular(14),
                   child: Container(
-                    constraints: const BoxConstraints(
+                    constraints: const BoxConstraints( // Ukuran minimum target sentuh
                       minWidth: 56,
                       minHeight: 56,
                     ),
@@ -294,8 +294,8 @@ class _MainPageState extends State<MainPage> {
                     ),
                     decoration: BoxDecoration(
                       color: isActive
-                          ? activeColor.withValues(alpha: 0.10)
-                          : Colors.transparent,
+                          ? activeColor.withValues(alpha: 0.10) // Latar tipis untuk tab aktif
+                          : Colors.transparent, // Transparan untuk tab tidak aktif
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Column(
@@ -303,17 +303,17 @@ class _MainPageState extends State<MainPage> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          isActive ? item.activeIcon : item.inactiveIcon,
+                          isActive ? item.activeIcon : item.inactiveIcon, // Ganti ikon sesuai status aktif
                           size: 24,
-                          color: isActive ? activeColor : inactiveColor,
+                          color: isActive ? activeColor : inactiveColor, // Ganti warna sesuai status aktif
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          item.label,
+                          item.label, // Label tab
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight:
-                                isActive ? FontWeight.w600 : FontWeight.w400,
+                                isActive ? FontWeight.w600 : FontWeight.w400, // Tebal saat aktif
                             color: isActive ? activeColor : inactiveColor,
                           ),
                         ),
