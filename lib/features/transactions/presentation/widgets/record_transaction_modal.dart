@@ -22,6 +22,7 @@ class RecordTransactionModal extends StatefulWidget {
   final bool? prefillIsIncome;
   final int? prefillNominal;
   final String? prefillKategori;
+  final String? prefillMetode;
   final String? prefillCatatan;
 
   const RecordTransactionModal({
@@ -30,6 +31,7 @@ class RecordTransactionModal extends StatefulWidget {
     this.prefillIsIncome,
     this.prefillNominal,
     this.prefillKategori,
+    this.prefillMetode,
     this.prefillCatatan,
   });
 
@@ -63,6 +65,10 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
     return bersih.isEmpty ? null : int.tryParse(bersih); // null bila kosong, angka bila ada isi
   }
 
+  /// Hanya dua nilai yang dikenal form ini — cegah AI "mengarang" nilai
+  /// metode bayar lain yang tidak dikenal salah satu opsi di layar.
+  static bool _metodeValid(String? v) => v == 'tunai' || v == 'non tunai';
+
   @override
   void initState() {
     super.initState();
@@ -88,6 +94,9 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
         _keteranganCtrl.text = widget.prefillCatatan!; // isi keterangan dari hasil suara
       }
       _kategori = widget.prefillKategori; // isi kategori dari hasil suara bila ada
+      if (_metodeValid(widget.prefillMetode)) {
+        _metode = widget.prefillMetode!; // isi metode bayar dari hasil suara bila disebutkan
+      }
     }
 
     _muatKategoriAwal(); // muat daftar kategori sesuai jenis transaksi saat ini
@@ -325,6 +334,7 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
         _keteranganCtrl.text = hasil.catatan; // isi keterangan dari hasil pengenalan suara
       }
       if (hasil.kategori != null) _kategori = hasil.kategori; // isi kategori dari hasil pengenalan suara
+      if (_metodeValid(hasil.metode)) _metode = hasil.metode!; // isi metode bayar dari hasil pengenalan suara
     });
     // Memuat ulang daftar kategori untuk jenis (masuk/keluar) yang
     // mungkin baru saja berubah — _kategori sudah diisi di atas jadi

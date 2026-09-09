@@ -9,12 +9,14 @@ class ParsedTransaction { // Struktur data hasil penguraian ucapan oleh AI
   final int? nominal; // Nominal transaksi yang terdeteksi, bisa kosong
   final String? jenis; // 'masuk' atau 'keluar'
   final String? kategori; // Kategori transaksi yang terdeteksi, bisa kosong
+  final String? metode; // 'tunai' atau 'non tunai', null jika tidak disebutkan
   final String catatan; // Catatan tambahan hasil penguraian
 
   const ParsedTransaction({ // Konstruktor, hanya catatan yang wajib diisi
     this.nominal,
     this.jenis,
     this.kategori,
+    this.metode,
     required this.catatan,
   });
 
@@ -23,6 +25,7 @@ class ParsedTransaction { // Struktur data hasil penguraian ucapan oleh AI
       nominal: (json['nominal'] as num?)?.toInt(), // Ubah angka JSON menjadi int, aman jika null
       jenis: json['jenis'] as String?,
       kategori: json['kategori'] as String?,
+      metode: json['metode'] as String?,
       catatan: json['catatan'] as String? ?? '', // Default string kosong jika tidak ada
     );
   }

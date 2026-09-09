@@ -2,6 +2,7 @@ import 'package:flutter/material.dart'; // widget dan tema dasar Flutter
 import 'package:flutter/semantics.dart'; // untuk pengumuman ke pembaca layar
 import 'package:flutter/services.dart'; // untuk SystemUiOverlayStyle (warna status bar)
 import '../../../../core/navigation/app_route.dart'; // helper pembuat rute navigasi
+import '../../../../core/services/keamanan_controller.dart'; // pengelola pengaturan metode masuk (suara/biometrik)
 import '../../../../core/theme/app_colors.dart'; // palet warna aplikasi
 import '../../../../core/theme/app_typography.dart'; // gaya teks standar aplikasi
 import '../../../../core/theme/theme_controller.dart'; // pengatur mode tema (terang/gelap/sistem)
@@ -33,12 +34,15 @@ class _ProfilePageState extends State<ProfilePage> {
 
   // Dipindah dari halaman Informasi Profil supaya cepat dijangkau —
   // sebelumnya ada di balik seluruh Data Pribadi dan Data Usaha.
-  // Sementara masih state lokal, belum dikoneksikan ke basis data.
   // Mode Gelap TIDAK ada di sini lagi — itu sekarang punya bagiannya
   // sendiri (_pilihanTampilan) karena butuh 3 pilihan, bukan sakelar
   // hidup-mati, dan sudah benar-benar tersambung ke ThemeController.
-  bool _voiceMode = false; // status sakelar mode suara (belum tersambung ke backend)
-  bool _biometricAuth = false; // status sakelar autentikasi biometrik (belum tersambung ke backend)
+  //
+  // Mode Suara & Autentikasi Biometrik sekarang tersambung ke
+  // KeamananController (lihat _keamanan di bawah) — mengaktifkan
+  // salah satunya di sini langsung menambah opsi masuk yang
+  // ditawarkan PinLockPage, bukan sekadar sakelar kosmetik.
+  final _keamanan = KeamananController.instance; // akses pengaturan metode masuk lewat singleton controller
 
   final _repo = ProfileRepository.instance; // akses data profil lewat singleton repository
 
@@ -210,33 +214,45 @@ class _ProfilePageState extends State<ProfilePage> {
                   borderRadius: BorderRadius.circular(14),
                   child: Column(
                     children: [
-                      _buildSettingToggle(
-                        icon: Icons.mic_outlined,
-                        label: 'Mode Suara',
-                        value: _voiceMode,
-                        onChanged: (val) {
-                          setState(() => _voiceMode = val); // perbarui status sakelar mode suara
-                          SemanticsService.sendAnnouncement(
-                            View.of(context),
-                            'Mode suara ${val ? "dinyalakan" : "dimatikan"}', // umumkan perubahan ke pembaca layar
-                            Directionality.of(context),
-                          );
-                        },
-                      ),
-                      Divider(height: 1, indent: 46, color: _garis(context)),
-                      _buildSettingToggle(
-                        icon: Icons.fingerprint_outlined,
-                        label: 'Autentikasi Biometrik',
-                        value: _biometricAuth,
-                        onChanged: (val) {
-                          setState(() => _biometricAuth = val); // perbarui status sakelar biometrik
-                          SemanticsService.sendAnnouncement(
-                            View.of(context),
-                            'Autentikasi biometrik '
-                            '${val ? "dinyalakan" : "dimatikan"}',
-                            Directionality.of(context),
-                          );
-                        },
+                      ListenableBuilder( // Bangun ulang dua baris ini saat salah satu pengaturan berubah
+                        listenable: Listenable.merge([
+                          _keamanan.suaraAktif,
+                          _keamanan.biometrikAktif,
+                        ]),
+                        builder: (context, _) => Column(
+                          children: [
+                            _buildSettingToggle(
+                              icon: Icons.mic_outlined,
+                              label: 'Mode Suara',
+                              value: _keamanan.suaraAktif.value,
+                              onChanged: (val) {
+                                _keamanan.ubahSuara(val); // simpan & terapkan opsi masuk lewat suara
+                                SemanticsService.sendAnnouncement(
+                                  View.of(context),
+                                  'Mode suara ${val ? "dinyalakan" : "dimatikan"}. '
+                                  '${val ? "Opsi masuk dengan suara kini tersedia di layar kunci." : ""}',
+                                  Directionality.of(context),
+                                );
+                              },
+                            ),
+                            Divider(height: 1, indent: 46, color: _garis(context)),
+                            _buildSettingToggle(
+                              icon: Icons.fingerprint_outlined,
+                              label: 'Autentikasi Biometrik',
+                              value: _keamanan.biometrikAktif.value,
+                              onChanged: (val) {
+                                _keamanan.ubahBiometrik(val); // simpan & terapkan opsi masuk lewat biometrik
+                                SemanticsService.sendAnnouncement(
+                                  View.of(context),
+                                  'Autentikasi biometrik '
+                                  '${val ? "dinyalakan" : "dimatikan"}. '
+                                  '${val ? "Opsi masuk dengan sidik jari kini tersedia di layar kunci." : ""}',
+                                  Directionality.of(context),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
                       ),
                       Divider(height: 1, indent: 46, color: _garis(context)),
                       _pilihanTampilan(), // baris pemilih mode tampilan (terang/gelap/sistem)

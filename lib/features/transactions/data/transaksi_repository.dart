@@ -190,7 +190,8 @@ class TransaksiRepository { // Kelas satu-satunya jalur akses ke tabel transaksi
         DateTime(sekarang.year, sekarang.month, sekarang.day);
     final DateTime selesai = mulai.add(const Duration(days: 1)); // Awal hari besok, jadi batas akhir rentang hari ini
 
-    final List<Map<String, Object?>> total = await db.rawQuery(''' // Query SQL mentah: total masuk & keluar sepanjang masa (untuk saldo)
+    // Query SQL mentah: total masuk & keluar sepanjang masa (untuk saldo)
+    final List<Map<String, Object?>> total = await db.rawQuery('''
       SELECT
         COALESCE(SUM(CASE WHEN type = 'masuk'  THEN nominal END), 0) AS masuk,
         COALESCE(SUM(CASE WHEN type = 'keluar' THEN nominal END), 0) AS keluar
@@ -198,7 +199,8 @@ class TransaksiRepository { // Kelas satu-satunya jalur akses ke tabel transaksi
       WHERE deleted_at IS NULL
     ''');
 
-    final List<Map<String, Object?>> hariIni = await db.rawQuery(''' // Query SQL mentah: total masuk, keluar, dan jumlah transaksi khusus hari ini
+    // Query SQL mentah: total masuk, keluar, dan jumlah transaksi khusus hari ini
+    final List<Map<String, Object?>> hariIni = await db.rawQuery('''
       SELECT
         COALESCE(SUM(CASE WHEN type = 'masuk'  THEN nominal END), 0) AS masuk,
         COALESCE(SUM(CASE WHEN type = 'keluar' THEN nominal END), 0) AS keluar,

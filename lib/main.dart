@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart'; // Widget-widget dasar Flutter (Material Design)
 
 import 'core/services/aksesibilitas_controller.dart'; // Pengelola pengaturan aksesibilitas
+import 'core/services/keamanan_controller.dart'; // Pengelola pengaturan metode masuk (suara/biometrik)
 import 'core/theme/app_theme.dart'; // Definisi tema terang/gelap aplikasi
 import 'core/theme/theme_controller.dart'; // Pengelola mode tema aktif
 import 'features/auth/presentation/pages/pin_lock_page.dart'; // Halaman kunci PIN saat aplikasi dibuka
@@ -12,6 +13,7 @@ void main() async { // Titik masuk aplikasi Flutter
   // ke gelap saat pertama dibuka.
   await ThemeController.instance.muat(); // Muat pengaturan tema tersimpan sebelum UI tampil
   await AksesibilitasController.instance.muat(); // Muat pengaturan aksesibilitas tersimpan sebelum UI tampil
+  await KeamananController.instance.muat(); // Muat pengaturan metode masuk tersimpan sebelum UI tampil
   runApp(const MyApp()); // Jalankan aplikasi dengan widget akar MyApp
 }
 

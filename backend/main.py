@@ -41,6 +41,7 @@ class ParseTransaksiResponse(BaseModel):
     nominal: int | None
     jenis: str | None  # "masuk" atau "keluar"
     kategori: str | None
+    metode: str | None  # "tunai" atau "non tunai"
     catatan: str
 
 
@@ -60,6 +61,10 @@ Dari teks yang diberikan, tentukan:
   keluar), yang paling cocok dengan isi ucapan. null jika tidak ada yang
   cocok sama sekali atau jenis tidak jelas. Jangan mengarang kategori di
   luar daftar yang diberikan.
+- metode: "tunai" jika ucapan menyebut uang tunai/cash/kontan, atau
+  "non tunai" jika menyebut transfer, QRIS, kartu debit/kredit, e-wallet
+  (mis. OVO, GoPay, Dana), atau metode nontunai lain. null jika metode
+  pembayaran sama sekali tidak disebutkan dalam ucapan.
 - catatan: ringkasan singkat barang/aktivitasnya (bukan nominal, bukan
   kategori), dalam Bahasa Indonesia natural, maksimal satu kalimat pendek.
 
@@ -91,6 +96,7 @@ async def parse_transaction(req: ParseTransaksiRequest) -> ParseTransaksiRespons
                     "nominal": {"type": "INTEGER", "nullable": True},
                     "jenis": {"type": "STRING", "nullable": True},
                     "kategori": {"type": "STRING", "nullable": True},
+                    "metode": {"type": "STRING", "nullable": True},
                     "catatan": {"type": "STRING"},
                 },
                 "required": ["catatan"],
@@ -133,6 +139,7 @@ async def parse_transaction(req: ParseTransaksiRequest) -> ParseTransaksiRespons
         nominal=hasil.get("nominal"),
         jenis=hasil.get("jenis"),
         kategori=hasil.get("kategori"),
+        metode=hasil.get("metode"),
         catatan=hasil.get("catatan", ""),
     )
 

@@ -3,8 +3,12 @@ import 'dart:async'; // Untuk Timer (hitung mundur penguncian)
 import 'package:flutter/material.dart'; // Widget dan tema dasar Flutter
 import 'package:flutter/semantics.dart'; // Untuk mengirim pengumuman ke screen reader
 import 'package:flutter/services.dart'; // Untuk HapticFeedback (getaran) dan SystemUiOverlayStyle
+import 'package:local_auth/local_auth.dart'; // Autentikasi biometrik (sidik jari/wajah) bawaan perangkat
 
+import '../../../../core/services/keamanan_controller.dart'; // Pengaturan metode masuk tambahan (suara/biometrik)
 import '../../../../core/theme/theme_extensions.dart'; // Extension context.warnaXxx untuk warna sesuai tema
+import '../../../../core/utils/spoken_digits.dart'; // Pengurai ucapan angka jadi deretan digit PIN
+import '../../../transactions/presentation/widgets/voice_transaction_flow.dart'; // dengarkanUcapan(): lembar dengar suara generik
 import '../../data/auth_repository.dart'; // Sumber data & logika autentikasi PIN
 import '../widgets/pin_keypad.dart'; // Widget keypad angka dan indikator titik PIN
 
@@ -33,6 +37,7 @@ enum _Tahap { memuat, buatBaru, konfirmasiBaru, masuk } // Tahap alur: memuat da
 
 class _PinLockPageState extends State<PinLockPage> {
   final AuthRepository _repo = AuthRepository.instance; // Ambil instance singleton repository auth
+  final LocalAuthentication _localAuth = LocalAuthentication(); // Klien plugin biometrik bawaan perangkat
 
   _Tahap _tahap = _Tahap.memuat; // Tahap alur saat ini, mulai dari memuat
   String _pin = ''; // Digit PIN yang sedang diketik pengguna
@@ -42,6 +47,14 @@ class _PinLockPageState extends State<PinLockPage> {
 
   int _sisaKunci = 0; // Sisa detik penguncian akibat terlalu banyak percobaan salah
   Timer? _timer; // Timer untuk hitung mundur penguncian
+
+  /// PIN tetap kredensial dasar yang selalu tersedia (lihat
+  /// KeamananController) — dua ini cuma menambah jalan masuk lain di
+  /// SAMPING keypad, tidak pernah menggantikannya.
+  bool get _bisaSuara =>
+      _tahap == _Tahap.masuk && KeamananController.instance.suaraAktif.value; // Opsi suara hanya relevan saat login, bukan saat membuat PIN baru
+  bool get _bisaBiometrik =>
+      _tahap == _Tahap.masuk && KeamananController.instance.biometrikAktif.value; // Sama halnya untuk biometrik
 
   @override
   void initState() { // Dipanggil sekali saat halaman pertama dibuat
@@ -75,6 +88,19 @@ class _PinLockPageState extends State<PinLockPage> {
         _judul,
         Directionality.of(context),
       );
+    }
+
+    // Tawarkan biometrik segera begitu layar masuk terbuka — pengguna
+    // yang mengaktifkannya di Profil biasanya berharap ini otomatis,
+    // sama seperti pola umum aplikasi perbankan. Keypad PIN tetap utuh
+    // di belakangnya kalau pengguna membatalkan atau biometrik gagal.
+    if (ada && kunci == 0 && _bisaBiometrik) {
+      // Jeda sebentar supaya halaman (dan pengumuman judul di atas)
+      // sempat selesai tampil/dibacakan dulu sebelum prompt sistem
+      // menimpanya — tanpa ini keduanya tumpang tindih.
+      Future.delayed(const Duration(milliseconds: 400), () {
+        if (mounted) _masukDenganBiometrik(otomatis: true);
+      });
     }
   }
 
@@ -156,31 +182,112 @@ class _PinLockPageState extends State<PinLockPage> {
         widget.onBerhasil(); // Panggil callback bahwa PIN berhasil diproses
 
       case _Tahap.masuk: // Tahap login dengan PIN yang sudah ada
-        final bool cocok = await _repo.verifikasiPin(_pin); // Cek apakah PIN yang diketik benar
-        if (!mounted) return; // Batalkan jika widget sudah dilepas selama await
-
-        if (cocok) { // Jika PIN benar
-          _umumkan('PIN benar. Membuka aplikasi.'); // Umumkan keberhasilan
-          HapticFeedback.mediumImpact(); // Getaran sedang sebagai konfirmasi
-          widget.onBerhasil(); // Panggil callback sukses
-          return;
-        }
-
-        final int kunci = await _repo.sisaPenguncian(); // Cek apakah sekarang jadi terkunci
-        if (!mounted) return; // Batalkan jika widget sudah dilepas selama await
-
-        if (kunci > 0) { // Jika akun terkunci akibat terlalu banyak percobaan
-          setState(() => _sisaKunci = kunci); // Simpan sisa waktu kunci
-          _jalankanHitungMundur(); // Mulai timer hitung mundur
-          _tampilkanGalat('Terlalu banyak percobaan. Coba lagi nanti.'); // Tampilkan pesan galat
-        } else { // Jika belum terkunci, masih ada kesempatan mencoba lagi
-          final int sisa = await _repo.sisaPercobaan(); // Ambil sisa jumlah percobaan yang diizinkan
-          if (!mounted) return; // Batalkan jika widget sudah dilepas selama await
-          _tampilkanGalat('PIN salah. Sisa $sisa percobaan.'); // Tampilkan galat dengan sisa percobaan
-        }
+        await _verifikasiPinString(_pin); // Cocokkan PIN yang diketik lewat keypad
 
       case _Tahap.memuat: // Kasus tahap masih memuat (seharusnya tidak terjadi saat proses dipanggil)
         setState(() => _sibuk = false); // Reset status sibuk saja
+    }
+  }
+
+  /// Inti verifikasi PIN untuk tahap masuk — dipakai bersama oleh
+  /// keypad (lewat [_proses]) dan "Masuk dengan Suara" ([_masukDenganSuara]),
+  /// supaya keduanya melewati persis aturan yang sama: penghitung
+  /// percobaan, penguncian sementara, pola getaran, dan pengumuman ke
+  /// pembaca layar. Dipanggil hanya SETELAH [_pin] diisi (baik lewat
+  /// ketikan maupun hasil ucapan) sehingga [_sibuk] sudah aktif.
+  Future<void> _verifikasiPinString(String pin) async { // Verifikasi satu deretan digit PIN terhadap yang tersimpan
+    final bool cocok = await _repo.verifikasiPin(pin); // Cek apakah PIN yang diberikan benar
+    if (!mounted) return; // Batalkan jika widget sudah dilepas selama await
+
+    if (cocok) { // Jika PIN benar
+      _umumkan('PIN benar. Membuka aplikasi.'); // Umumkan keberhasilan
+      HapticFeedback.mediumImpact(); // Getaran sedang sebagai konfirmasi
+      widget.onBerhasil(); // Panggil callback sukses
+      return;
+    }
+
+    final int kunci = await _repo.sisaPenguncian(); // Cek apakah sekarang jadi terkunci
+    if (!mounted) return; // Batalkan jika widget sudah dilepas selama await
+
+    if (kunci > 0) { // Jika akun terkunci akibat terlalu banyak percobaan
+      setState(() => _sisaKunci = kunci); // Simpan sisa waktu kunci
+      _jalankanHitungMundur(); // Mulai timer hitung mundur
+      _tampilkanGalat('Terlalu banyak percobaan. Coba lagi nanti.'); // Tampilkan pesan galat
+    } else { // Jika belum terkunci, masih ada kesempatan mencoba lagi
+      final int sisa = await _repo.sisaPercobaan(); // Ambil sisa jumlah percobaan yang diizinkan
+      if (!mounted) return; // Batalkan jika widget sudah dilepas selama await
+      _tampilkanGalat('PIN salah. Sisa $sisa percobaan.'); // Tampilkan galat dengan sisa percobaan
+    }
+  }
+
+  /// Membuka lembar dengar suara, menguraikan hasilnya jadi 6 digit PIN
+  /// murni di perangkat (lihat spoken_digits.dart — TANPA lewat AI/
+  /// backend), lalu memverifikasinya lewat jalur yang sama persis
+  /// dengan ketikan keypad. Ucapan yang gagal diuraikan diperlakukan
+  /// sebagai "tidak dikenali", bukan "PIN salah" — supaya tidak diam-
+  /// diam memakan jatah percobaan pengguna karena mikrofon salah dengar.
+  Future<void> _masukDenganSuara() async { // Alur masuk dengan mengeja PIN lewat ucapan
+    if (_sibuk || _sisaKunci > 0) return; // Abaikan jika sedang sibuk atau terkunci
+
+    final String? teks = await dengarkanUcapan(context); // Dengarkan ucapan, tunggu hasil teksnya
+    if (!mounted || teks == null || teks.trim().isEmpty) return; // Batalkan jika dibatalkan/tidak ada suara
+
+    final String? pinTerurai = uraikanUcapanPin(teks); // Coba ubah ucapan jadi 6 digit PIN
+    if (pinTerurai == null) { // Gagal dikenali sebagai 6 digit yang valid
+      _tampilkanGalat(
+        'PIN tidak dikenali dari ucapan. Eja tiap digit satu per satu, '
+        'misalnya "tiga tiga empat lima nol satu".',
+      );
+      return;
+    }
+
+    setState(() {
+      _pin = pinTerurai; // Tampilkan sebagai titik terisi di indikator, sama seperti hasil ketikan
+      _sibuk = true; // Tandai sedang memproses agar input lain diabaikan sementara
+    });
+    await _verifikasiPinString(pinTerurai); // Verifikasi lewat jalur yang sama dengan ketikan keypad
+  }
+
+  /// Meminta autentikasi biometrik bawaan perangkat (sidik jari/wajah).
+  /// [otomatis] membedakan pemicu diam-diam saat halaman baru terbuka
+  /// (lihat [_mulai]) dari ketukan tombol eksplisit — kegagalan/pembatalan
+  /// pada pemicu otomatis tidak perlu menampilkan pesan galat yang
+  /// mengagetkan, sebab pengguna tidak diam-diam meminta apa pun.
+  Future<void> _masukDenganBiometrik({bool otomatis = false}) async { // Alur masuk dengan biometrik bawaan perangkat
+    if (_sibuk || _sisaKunci > 0) return; // Abaikan jika sedang sibuk atau terkunci
+
+    try {
+      final bool didukung = await _localAuth.isDeviceSupported(); // Cek apakah perangkat punya sensor biometrik
+      final bool bisaCek = await _localAuth.canCheckBiometrics; // Cek apakah ada biometrik yang terdaftar
+      if (!didukung || !bisaCek) { // Perangkat ini tidak punya biometrik yang bisa dipakai
+        if (!otomatis) { // Hanya beri tahu bila pengguna sendiri yang menekan tombolnya
+          _umumkan('Biometrik tidak tersedia di perangkat ini.');
+        }
+        return;
+      }
+
+      final bool berhasil = await _localAuth.authenticate( // Tampilkan prompt biometrik bawaan sistem
+        localizedReason: 'Verifikasi identitas Anda untuk membuka Modio',
+        options: const AuthenticationOptions(
+          biometricOnly: true, // Jangan turun ke PIN/pola layar kunci OS — PIN Modio sendiri sudah jadi cadangannya
+          stickyAuth: true, // Tetap berjalan walau app sempat pindah ke latar (mis. notifikasi masuk)
+        ),
+      );
+      if (!mounted) return; // Batalkan jika widget sudah dilepas selama menunggu prompt
+
+      if (berhasil) { // Biometrik cocok
+        _umumkan('Biometrik berhasil. Membuka aplikasi.'); // Umumkan keberhasilan
+        HapticFeedback.mediumImpact(); // Pola getaran sukses, sama seperti PIN benar
+        widget.onBerhasil(); // Panggil callback sukses
+      } else if (!otomatis) { // Dibatalkan/gagal cocok, dan pengguna sendiri yang meminta
+        _umumkan('Biometrik dibatalkan. Silakan masukkan PIN.');
+      }
+      // Gagal/batal pada pemicu otomatis: diam saja, keypad PIN di
+      // baliknya sudah selalu tersedia sebagai jalan masuk.
+    } catch (_) { // Mis. sensor bermasalah, atau tidak ada biometrik terdaftar di OS
+      if (!otomatis) {
+        _umumkan('Biometrik tidak bisa digunakan saat ini. Silakan masukkan PIN.');
+      }
     }
   }
 
@@ -308,10 +415,95 @@ class _PinLockPageState extends State<PinLockPage> {
               onHapus: _hapus, // Callback saat tombol hapus ditekan
               nonaktif: _sibuk || terkunci, // Nonaktifkan keypad saat sibuk atau terkunci
             ),
+
+            // Jalan masuk tambahan di samping keypad — hanya muncul
+            // kalau sakelarnya aktif di Profil > Mode Suara/Autentikasi
+            // Biometrik. Tidak pernah menggantikan keypad, cuma
+            // melengkapinya (lihat KeamananController).
+            if (!terkunci && (_bisaSuara || _bisaBiometrik)) ...[
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (_bisaBiometrik)
+                    _TombolMasukAlternatif(
+                      icon: Icons.fingerprint_rounded,
+                      label: 'Sidik Jari',
+                      onTap: _sibuk ? null : () => _masukDenganBiometrik(),
+                    ),
+                  if (_bisaBiometrik && _bisaSuara) const SizedBox(width: 20),
+                  if (_bisaSuara)
+                    _TombolMasukAlternatif(
+                      icon: Icons.mic_rounded,
+                      label: 'Ucapkan PIN',
+                      onTap: _sibuk ? null : _masukDenganSuara,
+                    ),
+                ],
+              ),
+            ],
             const SizedBox(height: 28),
           ],
         ),
       ),
+      ),
+    );
+  }
+}
+
+/// Tombol jalan masuk alternatif (Sidik Jari/Ucapkan PIN) di layar
+/// kunci. `onTap` null berarti nonaktif sementara (mis. sedang
+/// memproses), ditampilkan pudar dan tidak bisa diketuk.
+class _TombolMasukAlternatif extends StatelessWidget { // Tombol bulat + label untuk satu opsi masuk tambahan
+  final IconData icon; // Ikon yang mewakili opsi ini
+  final String label; // Nama opsi yang ditampilkan & dibacakan
+  final VoidCallback? onTap; // Aksi saat diketuk, null bila nonaktif
+
+  const _TombolMasukAlternatif({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bool aktif = onTap != null; // Status aktif/nonaktif tombol ini
+    final Color warna = aktif
+        ? Theme.of(context).colorScheme.primary
+        : context.warnaTeksMuted;
+
+    return Semantics(
+      button: true,
+      enabled: aktif,
+      label: label,
+      hint: aktif ? 'Ketuk dua kali untuk memilih' : null,
+      onTap: onTap,
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          // 56dp: ukuran sentuh minimum, bukan cuma bungkus ikon —
+          // target kecil sulit dijangkau tepat tanpa melihat layar.
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 56, minHeight: 56),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 28, color: warna),
+                const SizedBox(height: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: warna,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

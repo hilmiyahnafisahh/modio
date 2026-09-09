@@ -113,6 +113,7 @@ Future<bool?> mulaiCatatTransaksiSuara(BuildContext context) async { // Entry po
       },
       prefillNominal: hasil.nominal, // Isi awal nominal dari hasil AI
       prefillKategori: hasil.kategori, // Isi awal kategori dari hasil AI
+      prefillMetode: hasil.metode, // Isi awal metode bayar dari hasil AI
       prefillCatatan: hasil.catatan, // Isi awal catatan dari hasil AI
     ),
   );

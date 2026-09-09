@@ -40,6 +40,7 @@ dependencies:
   flutter_svg: ^2.0.10+1
   http: ^1.2.0           # HTTP client untuk komunikasi API (dipakai di core/services/api_service.dart)
   speech_to_text: ^7.0.0 # Ucapan ke teks untuk pencatatan transaksi via suara
+  local_auth: ^2.3.0     # Autentikasi biometrik (sidik jari/wajah) bawaan perangkat untuk layar kunci
 
 dev_dependencies:
   flutter_test:
