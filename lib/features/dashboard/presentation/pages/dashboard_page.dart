@@ -114,7 +114,6 @@ class _DashboardPageState extends State<DashboardPage> { // Kelas State: tempat 
 
   @override
   Widget build(BuildContext context) { // Method wajib yang membangun tampilan (UI) halaman ini
-    final scheme = Theme.of(context).colorScheme; // Mengambil skema warna tema aktif untuk dipakai di seluruh build
     return AnnotatedRegion<SystemUiOverlayStyle>( // Widget untuk mengatur tampilan status bar sistem (Android/iOS)
       value: SystemUiOverlayStyle( // Konfigurasi gaya status bar
         statusBarColor: Colors.transparent, // Membuat status bar transparan agar menyatu dengan latar halaman
@@ -124,30 +123,10 @@ class _DashboardPageState extends State<DashboardPage> { // Kelas State: tempat 
       ),
       child: Scaffold( // Kerangka dasar halaman: menyediakan body, tombol apung, dsb
       backgroundColor: Theme.of(context).scaffoldBackgroundColor, // Warna latar halaman mengikuti tema aktif
-      floatingActionButton: SizedBox( // Membungkus tombol apung dengan ukuran tetap
-        width: 64, // Lebar tombol apung 64 pixel
-        height: 64, // Tinggi tombol apung 64 pixel
-        child: FloatingActionButton( // Tombol bulat mengambang khas Material Design
+      // VoiceFab menghilang sendiri saat Mode Suara dimatikan di Pengaturan.
+      floatingActionButton: VoiceFab(
         heroTag: 'fab_dashboard',
         onPressed: _handleVoiceInput, // Saat ditekan, jalankan fungsi penanganan input suara
-        backgroundColor: scheme.primary, // Warna latar tombol memakai warna utama tema
-        elevation: 4, // Tinggi bayangan tombol agar terlihat "mengambang"
-        shape: const CircleBorder(), // Bentuk tombol dibuat bulat sempurna
-        tooltip: 'Catat transaksi dengan suara', // Teks bantuan yang muncul saat ditekan lama (long press)
-        // Semantics eksplisit, bukan cuma mengandalkan tooltip.
-        // Tanpa label ini pembaca layar hanya menyebutnya "tombol"
-        // tanpa keterangan, tak terbedakan dari tombol tambah lain.
-        child: Semantics( // Widget untuk memberi informasi tambahan ke pembaca layar (aksesibilitas)
-          button: true, // Memberi tahu pembaca layar bahwa elemen ini adalah tombol
-          label: 'Catat transaksi dengan suara', // Teks yang dibacakan oleh pembaca layar (TalkBack/VoiceOver)
-          excludeSemantics: true, // Mencegah elemen anak (Icon) dibacakan lagi secara terpisah
-          child: Icon( // Ikon yang ditampilkan di dalam tombol
-            Icons.mic_rounded, // Ikon mikrofon (bulat)
-            color: scheme.onPrimary, // Warna ikon kontras dengan warna latar tombol
-            size: 30, // Ukuran ikon 30 pixel
-          ),
-        ),
-        ),
       ),
       body: SafeArea( // Memastikan konten tidak tertutup notch, status bar, atau area sistem lain
         child: RefreshIndicator( // Widget yang menambahkan gestur "tarik untuk menyegarkan"

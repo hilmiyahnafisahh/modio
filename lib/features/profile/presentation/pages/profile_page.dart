@@ -38,10 +38,13 @@ class _ProfilePageState extends State<ProfilePage> {
   // sendiri (_pilihanTampilan) karena butuh 3 pilihan, bukan sakelar
   // hidup-mati, dan sudah benar-benar tersambung ke ThemeController.
   //
-  // Mode Suara & Autentikasi Biometrik sekarang tersambung ke
-  // KeamananController (lihat _keamanan di bawah) — mengaktifkan
-  // salah satunya di sini langsung menambah opsi masuk yang
-  // ditawarkan PinLockPage, bukan sekadar sakelar kosmetik.
+  // Kunci PIN, Mode Suara & Autentikasi Biometrik sekarang tersambung
+  // ke KeamananController (lihat _keamanan di bawah) — mengubah salah
+  // satunya di sini langsung berpengaruh: Kunci PIN menentukan apakah
+  // PinLockPage ditampilkan sama sekali saat aplikasi dibuka, Mode
+  // Suara menentukan boleh/tidaknya tombol mikrofon (baik di layar
+  // kunci maupun tombol catat transaksi suara) dipakai, dan Biometrik
+  // menambah opsi masuk di PinLockPage. Bukan sekadar sakelar kosmetik.
   final _keamanan = KeamananController.instance; // akses pengaturan metode masuk lewat singleton controller
 
   final _repo = ProfileRepository.instance; // akses data profil lewat singleton repository
@@ -109,30 +112,10 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
       child: Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor, // latar halaman sesuai tema
-      floatingActionButton: SizedBox(
-        width: 64,
-        height: 64,
-        child: FloatingActionButton(
+      // VoiceFab menghilang sendiri saat Mode Suara dimatikan di Pengaturan.
+      floatingActionButton: VoiceFab(
         heroTag: 'fab_profile', // tag unik agar tidak bentrok dengan FAB halaman lain
         onPressed: _handleVoiceInput, // buka pencatatan transaksi suara saat ditekan
-        backgroundColor: scheme.primary, // warna latar tombol mengambang
-        elevation: 4, // tinggi bayangan tombol
-        shape: const CircleBorder(), // bentuk lingkaran
-        tooltip: 'Catat transaksi dengan suara', // teks bantuan saat ditekan lama
-        // Semantics eksplisit, bukan cuma mengandalkan tooltip.
-        // Tanpa label ini pembaca layar hanya menyebutnya "tombol"
-        // tanpa keterangan, tak terbedakan dari tombol tambah lain.
-        child: Semantics(
-          button: true, // beri tahu pembaca layar ini elemen tombol
-          label: 'Catat transaksi dengan suara', // teks yang dibacakan pembaca layar
-          excludeSemantics: true, // sembunyikan detail semantik anak, pakai label ini saja
-          child: Icon(
-            Icons.mic_rounded, // ikon mikrofon
-            color: scheme.onPrimary, // warna ikon kontras dengan latar primary
-            size: 30,
-          ),
-        ),
-        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -214,23 +197,39 @@ class _ProfilePageState extends State<ProfilePage> {
                   borderRadius: BorderRadius.circular(14),
                   child: Column(
                     children: [
-                      ListenableBuilder( // Bangun ulang dua baris ini saat salah satu pengaturan berubah
+                      ListenableBuilder( // Bangun ulang tiga baris ini saat salah satu pengaturan berubah
                         listenable: Listenable.merge([
+                          _keamanan.pinAktif,
                           _keamanan.suaraAktif,
                           _keamanan.biometrikAktif,
                         ]),
                         builder: (context, _) => Column(
                           children: [
                             _buildSettingToggle(
+                              icon: Icons.pin_outlined,
+                              label: 'Kunci PIN',
+                              value: _keamanan.pinAktif.value,
+                              onChanged: (val) {
+                                _keamanan.ubahPin(val); // simpan & terapkan apakah layar kunci PIN ditampilkan
+                                SemanticsService.sendAnnouncement(
+                                  View.of(context),
+                                  'Kunci PIN ${val ? "dinyalakan" : "dimatikan"}. '
+                                  '${val ? "Aplikasi akan meminta PIN setiap dibuka." : "Aplikasi akan langsung terbuka tanpa PIN mulai berikutnya."}',
+                                  Directionality.of(context),
+                                );
+                              },
+                            ),
+                            Divider(height: 1, indent: 46, color: _garis(context)),
+                            _buildSettingToggle(
                               icon: Icons.mic_outlined,
                               label: 'Mode Suara',
                               value: _keamanan.suaraAktif.value,
                               onChanged: (val) {
-                                _keamanan.ubahSuara(val); // simpan & terapkan opsi masuk lewat suara
+                                _keamanan.ubahSuara(val); // simpan & terapkan fitur suara (PIN & catat transaksi)
                                 SemanticsService.sendAnnouncement(
                                   View.of(context),
                                   'Mode suara ${val ? "dinyalakan" : "dimatikan"}. '
-                                  '${val ? "Opsi masuk dengan suara kini tersedia di layar kunci." : ""}',
+                                  '${val ? "Anda bisa mencatat transaksi dan mengisi PIN dengan suara." : "Tombol mikrofon untuk mencatat transaksi dan mengeja PIN tidak akan berfungsi."}',
                                   Directionality.of(context),
                                 );
                               },

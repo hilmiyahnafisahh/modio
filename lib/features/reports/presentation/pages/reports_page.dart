@@ -85,7 +85,6 @@ class _ReportsPageState extends State<ReportsPage> { // kelas state untuk Report
 
   @override
   Widget build(BuildContext context) { // membangun tampilan halaman ini
-    final scheme = Theme.of(context).colorScheme; // ambil skema warna dari tema aktif
     return AnnotatedRegion<SystemUiOverlayStyle>( // atur tampilan status bar sistem
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent, // status bar transparan
@@ -95,30 +94,10 @@ class _ReportsPageState extends State<ReportsPage> { // kelas state untuk Report
       ),
       child: Scaffold( // kerangka halaman (body, floating action button, dll)
       backgroundColor: Theme.of(context).scaffoldBackgroundColor, // warna latar sesuai tema
-      floatingActionButton: SizedBox( // bungkus FAB agar ukurannya tetap
-        width: 64,
-        height: 64,
-        child: FloatingActionButton( // tombol mengambang untuk catat suara
+      // VoiceFab menghilang sendiri saat Mode Suara dimatikan di Pengaturan.
+      floatingActionButton: VoiceFab(
         heroTag: 'fab_reports', // tag unik agar tak bentrok dengan FAB halaman lain
         onPressed: _handleVoiceInput, // aksi saat tombol ditekan
-        backgroundColor: scheme.primary, // warna latar sesuai tema
-        elevation: 4, // tinggi bayangan tombol
-        shape: const CircleBorder(), // bentuk lingkaran
-        tooltip: 'Catat transaksi dengan suara', // teks bantuan saat ditekan lama
-        // Semantics eksplisit, bukan cuma mengandalkan tooltip.
-        // Tanpa label ini pembaca layar hanya menyebutnya "tombol"
-        // tanpa keterangan, tak terbedakan dari tombol tambah lain.
-        child: Semantics( // info aksesibilitas eksplisit untuk tombol ini
-          button: true, // beri tahu pembaca layar bahwa ini tombol
-          label: 'Catat transaksi dengan suara', // label yang diucapkan
-          excludeSemantics: true, // sembunyikan info semantik dari widget anak
-          child: Icon(
-            Icons.mic_rounded, // ikon mikrofon
-            color: scheme.onPrimary, // warna kontras di atas warna primary
-            size: 30, // ukuran ikon
-          ),
-        ),
-        ),
       ),
       body: SafeArea( // hindari area yang terpotong notch/status bar
         child: RefreshIndicator( // gestur tarik ke bawah untuk refresh data

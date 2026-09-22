@@ -6,6 +6,7 @@ import 'package:speech_to_text/speech_to_text.dart' as  stt; // Plugin pengenala
 
 import '../../../../core/navigation/main_nav_controller.dart'; // Pengontrol navigasi tab & suara
 import '../../../../core/services/ai_parser_service.dart'; // Layanan AI untuk menguraikan teks jadi data transaksi
+import '../../../../core/services/keamanan_controller.dart'; // Sakelar Mode Suara: mengatur boleh/tidaknya fitur suara dipakai
 import '../../../../core/theme/app_typography.dart'; // Gaya teks khusus aplikasi
 import '../../../../core/theme/theme_extensions.dart'; // Extension context.warnaXxx untuk warna sesuai tema
 import '../../data/transaction_model.dart'; // Model data transaksi & tipe (masuk/keluar)
@@ -25,7 +26,23 @@ import 'record_transaction_modal.dart'; // Modal form catat transaksi
 
 /// Menampilkan lembar "sedang mendengarkan" dan mengembalikan teks hasil
 /// ucapan, atau null bila dibatalkan/tidak ada suara terdeteksi.
+///
+/// Satu-satunya titik masuk mikrofon di seluruh aplikasi (dipakai
+/// tombol mic pencatat transaksi maupun "Ucapkan PIN" di layar kunci)
+/// — sehingga sakelar Mode Suara di Pengaturan cukup dijaga di sini
+/// saja untuk mematikan fitur suara di mana pun ia dipakai.
 Future<String?> dengarkanUcapan(BuildContext context) { // Fungsi untuk membuka lembar dengar suara
+  if (!KeamananController.instance.suaraAktif.value) { // Mode Suara sedang dimatikan lewat Pengaturan
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Mode Suara nonaktif. Nyalakan di Profil > Mode Suara untuk memakai fitur ini.',
+        ),
+      ),
+    );
+    return Future.value(null); // Batalkan tanpa membuka mikrofon sama sekali
+  }
+
   return showModalBottomSheet<String>( // Tampilkan modal dari bawah dan tunggu hasil teksnya
     context: context,
     backgroundColor: Colors.transparent, // Latar transparan agar sudut modal terlihat membulat
@@ -34,9 +51,12 @@ Future<String?> dengarkanUcapan(BuildContext context) { // Fungsi untuk membuka 
   );
 }
 
-/// Mengirim [teks] ke AI untuk diuraikan jadi data transaksi. Menampilkan
-/// snackbar dan mengembalikan null kalau gagal (mis. tidak ada koneksi ke
-/// proxy backend) — pemanggil tidak perlu menangani error-nya sendiri.
+/// Mengirim [teks] ke AI untuk diuraikan jadi data transaksi. Kalau AI-nya
+/// gagal dihubungi (mis. tidak ada koneksi ke proxy backend), TETAP
+/// mengembalikan hasil — bukan null — berisi ucapan mentah sebagai
+/// catatan saja, supaya pengguna tetap bisa lanjut mengisi form secara
+/// manual alih-alih ucapannya terbuang sia-sia. Menampilkan snackbar
+/// supaya pengguna tahu penguraian otomatis gagal.
 Future<ParsedTransaction?> uraikanUcapanTransaksi(
   BuildContext context,
   String teks, // Teks hasil ucapan yang akan diuraikan
@@ -60,11 +80,15 @@ Future<ParsedTransaction?> uraikanUcapanTransaksi(
     messenger.showSnackBar( // Tampilkan pesan error ke pengguna
       const SnackBar(
         content: Text(
-          'Gagal memproses ucapan. Periksa koneksi internet lalu coba lagi.',
+          'Tidak bisa menguraikan otomatis. Ucapan disalin ke catatan — '
+          'lengkapi sisanya secara manual.',
         ),
       ),
     );
-    return null; // Kembalikan null menandakan gagal
+    // Bukan null: ucapan mentah tetap dibawa sebagai catatan, supaya
+    // pemanggil (mulaiCatatTransaksiSuara / _pakaiSuara) tetap membuka
+    // form yang sudah terisi sebagian alih-alih berhenti total.
+    return ParsedTransaction(catatan: teks);
   }
 }
 
@@ -307,6 +331,59 @@ class _VoiceListenSheetState extends State<_VoiceListenSheet> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Tombol mengambang pencatat transaksi suara, dipakai di Beranda,
+/// Riwayat, Laporan, dan Profil.
+///
+/// Menghilang sepenuhnya (bukan sekadar nonaktif) saat Mode Suara mati
+/// di Pengaturan — tombol yang tetap terlihat tapi cuma menampilkan
+/// pesan galat saat ditekan membingungkan, seolah rusak.
+/// [dengarkanUcapan] tetap punya penjagaan sendiri sebagai jaring
+/// pengaman kedua untuk jalur lain yang tidak lewat tombol ini (mis.
+/// mic di dalam RecordTransactionModal).
+class VoiceFab extends StatelessWidget { // Tombol mengambang khusus catat transaksi via suara
+  const VoiceFab({super.key, required this.heroTag, required this.onPressed});
+
+  final String heroTag; // Tag unik agar tidak bentrok antar FAB di halaman lain
+  final VoidCallback onPressed; // Aksi saat tombol ditekan
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>( // Bangun ulang saat sakelar Mode Suara berubah
+      valueListenable: KeamananController.instance.suaraAktif,
+      builder: (context, suaraAktif, _) {
+        if (!suaraAktif) return const SizedBox.shrink(); // sembunyikan tombol sepenuhnya saat mode suara mati
+
+        final scheme = Theme.of(context).colorScheme; // skema warna tema aktif
+        return SizedBox( // bungkus tombol apung dengan ukuran tetap
+          width: 64,
+          height: 64,
+          child: FloatingActionButton( // tombol bulat mengambang khas Material Design
+            heroTag: heroTag,
+            onPressed: onPressed,
+            backgroundColor: scheme.primary, // warna latar tombol memakai warna utama tema
+            elevation: 4, // tinggi bayangan tombol agar terlihat "mengambang"
+            shape: const CircleBorder(), // bentuk tombol dibuat bulat sempurna
+            tooltip: 'Catat transaksi dengan suara', // teks bantuan saat ditekan lama
+            // Semantics eksplisit, bukan cuma mengandalkan tooltip.
+            // Tanpa label ini pembaca layar hanya menyebutnya "tombol"
+            // tanpa keterangan, tak terbedakan dari tombol tambah lain.
+            child: Semantics(
+              button: true,
+              label: 'Catat transaksi dengan suara',
+              excludeSemantics: true,
+              child: Icon(
+                Icons.mic_rounded,
+                color: scheme.onPrimary, // warna ikon kontras dengan warna latar tombol
+                size: 30,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
