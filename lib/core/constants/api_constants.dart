@@ -14,11 +14,11 @@ class ApiConstants { // Kumpulan konstanta terkait komunikasi API
   // di IP LAN laptop pengembang — HP harus satu jaringan WiFi dengan
   // laptop supaya bisa mengaksesnya. Ganti dengan URL server produksi
   // yang sebenarnya begitu proxy ini di-deploy ke tempat permanen.
-  static const String baseUrl = 'http://10.66.177.66:8000'; // Alamat dasar server backend
+  static const String baseUrl = 'http://10.66.180.254:8000'; // Alamat dasar server backend
 
   // ── Timeout ──────────────────────────────────────────────────────
   // Batas waktu tunggu koneksi (dalam detik)
-  static const int connectTimeoutSeconds = 10; // Batas waktu membangun koneksi
+  static const int connectTimeoutSeconds = 20; // Batas waktu membangun koneksi
   static const int receiveTimeoutSeconds = 15; // Batas waktu menunggu respons data
 
   // ── Endpoint Transaksi ───────────────────────────────────────────
