@@ -25,7 +25,11 @@ class MyApp extends StatefulWidget { // Widget akar aplikasi, punya state (statu
 }
 
 class _MyAppState extends State<MyApp> { // Kelas state yang menyimpan data berubah-ubah
-  bool _terbuka = false; // Status apakah pengguna sudah berhasil melewati kunci PIN
+  // KeamananController.instance.muat() sudah selesai di main() sebelum
+  // runApp dipanggil, jadi nilai pinAktif di sini sudah nilai tersimpan
+  // yang sebenarnya — bukan default sesaat. Kunci PIN nonaktif berarti
+  // langsung anggap "terbuka" sejak awal, lewati layar kunci sama sekali.
+  bool _terbuka = !KeamananController.instance.pinAktif.value; // Status apakah pengguna sudah berhasil melewati kunci PIN
 
   @override
   Widget build(BuildContext context) { // Membangun tampilan aplikasi

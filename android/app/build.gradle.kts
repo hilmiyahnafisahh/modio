@@ -21,7 +21,7 @@ android {
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         // 23, bukan flutter.minSdkVersion — local_auth (Autentikasi
         // Biometrik) butuh BiometricPrompt yang baru ada dari API 23.
-        minSdk = 23
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

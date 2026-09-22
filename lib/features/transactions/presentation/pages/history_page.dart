@@ -27,25 +27,26 @@ class HistoryPage extends StatefulWidget { // widget halaman Riwayat, punya stat
   State<HistoryPage> createState() => _HistoryPageState(); // buat objek state terkait halaman ini
 }
 
+/// Pilihan periode riwayat: cuma dua hari terakhir, tanpa kalender atau
+/// preset minggu/bulan/semua waktu — riwayat penuh tetap bisa dicari
+/// lewat kolom pencarian di atasnya kalau perlu tanggal yang lebih lama.
+enum _RiwayatPeriode { hariIni, kemarin }
+
 class _HistoryPageState extends State<HistoryPage> { // kelas state untuk HistoryPage
   final TransaksiRepository _repo = TransaksiRepository(); // sumber data transaksi, sekali dibuat
   final TextEditingController _cariCtrl = TextEditingController(); // pengendali teks kolom pencarian
 
   late Future<List<TransactionItem>> _transaksi; // daftar transaksi async, diisi belakangan
 
-  PeriodeFilter _periode = PeriodeFilter.semua; // preset periode aktif, awalnya "semua"
-
-  /// Tanggal spesifik hasil pilih di kalender. Diisi berarti mengganti
-  /// [_periode] sepenuhnya — beda dari preset yang selalu relatif
-  /// terhadap sekarang, ini bisa hari mana pun di masa lalu.
-  DateTime? _tanggalKhusus; // tanggal spesifik terpilih, null jika pakai preset
+  _RiwayatPeriode _periode = _RiwayatPeriode.hariIni; // periode aktif, awalnya "Hari Ini"
 
   TransactionType? _jenis; // null berarti semua jenis
 
   /// Label periode yang sedang aktif, ditampilkan di tombol pemilih.
-  String get _labelPeriode => _tanggalKhusus != null // pilih label sesuai sumber periode aktif
-      ? DateFormatter.dateWithMonth(_tanggalKhusus!) // tampilkan tanggal spesifik jika ada
-      : _periode.label; // kalau tidak, pakai label preset
+  String get _labelPeriode => switch (_periode) {
+        _RiwayatPeriode.hariIni => 'Hari Ini',
+        _RiwayatPeriode.kemarin => 'Kemarin',
+      };
 
   /// Label jenis transaksi yang sedang aktif, ditampilkan di tombol
   /// pemilih jenis.
@@ -69,11 +70,14 @@ class _HistoryPageState extends State<HistoryPage> { // kelas state untuk Histor
 
   void _muat() { // fungsi untuk memuat/memuat ulang daftar transaksi
     setState(() { // beri tahu Flutter agar UI dibangun ulang
-      // batas null: seluruh riwayat, bukan hanya sebagian.
+      final bool kemarin = _periode == _RiwayatPeriode.kemarin; // true bila periode aktif adalah "Kemarin"
+      // batas null: seluruh riwayat hari itu, bukan hanya sebagian.
       _transaksi = _repo.riwayat( // ambil data sesuai filter aktif
         batas: null, // tanpa batas jumlah, ambil semua
-        periode: _periode, // filter preset periode
-        tanggalKhusus: _tanggalKhusus, // filter tanggal spesifik jika ada
+        periode: kemarin ? PeriodeFilter.semua : PeriodeFilter.hariIni, // diabaikan repo saat tanggalKhusus diisi
+        tanggalKhusus: kemarin // "Kemarin" selalu satu hari kalender spesifik: hari ini dikurangi satu
+            ? DateTime.now().subtract(const Duration(days: 1))
+            : null,
         type: _jenis, // filter jenis transaksi
         cari: _cariCtrl.text, // kata kunci pencarian
       );
@@ -99,42 +103,12 @@ class _HistoryPageState extends State<HistoryPage> { // kelas state untuk Histor
     SemanticsService.sendAnnouncement(View.of(context), pesan, Directionality.of(context)); // ucapkan pesan lewat pembaca layar
   }
 
-  /// Menerapkan preset (Hari ini/Minggu ini/Bulan ini/Semua) — menghapus
-  /// tanggal khusus yang mungkin sedang aktif, sebab keduanya saling
-  /// meniadakan.
-  void _terapkanPreset(PeriodeFilter p) { // terapkan pilihan preset periode
-    setState(() { // perbarui state periode
-      _periode = p; // simpan preset baru
-      _tanggalKhusus = null; // hapus tanggal spesifik agar tidak bentrok
-    });
-    _muat(); // muat ulang data sesuai preset baru
+  /// Menerapkan pilihan periode (Hari Ini/Kemarin).
+  void _pilihPeriode(_RiwayatPeriode p) { // terapkan pilihan periode baru
+    if (p == _periode) return; // sudah aktif, tidak perlu memuat ulang
+    setState(() => _periode = p); // simpan periode baru
+    _muat(); // muat ulang data sesuai periode baru
     _umumkanHasil(); // umumkan hasilnya ke pembaca layar
-  }
-
-  /// Menerapkan tanggal spesifik hasil pilih di kalender.
-  void _terapkanTanggal(DateTime tanggal) { // terapkan tanggal spesifik terpilih
-    setState(() { // perbarui state tanggal
-      _tanggalKhusus = tanggal; // simpan tanggal spesifik baru
-      _periode = PeriodeFilter.semua; // reset preset karena digantikan tanggal
-    });
-    _muat(); // muat ulang data sesuai tanggal baru
-    _umumkanHasil(); // umumkan hasilnya ke pembaca layar
-  }
-
-  Future<void> _bukaPeriodeDialog() async { // buka dialog pemilih periode
-    final _PeriodeHasil? hasil = await showDialog<_PeriodeHasil>( // tampilkan dialog, tunggu hasilnya
-      context: context,
-      builder: (_) => _PeriodeDialog( // bangun dialog pemilih periode
-        periodeAktif: _periode, // kirim preset aktif saat ini
-        tanggalAktif: _tanggalKhusus, // kirim tanggal aktif saat ini
-      ),
-    );
-    if (hasil == null) return; // pengguna membatalkan dialog, tidak lakukan apa-apa
-    if (hasil.preset != null) { // jika hasil berupa preset
-      _terapkanPreset(hasil.preset!); // terapkan preset itu
-    } else if (hasil.tanggal != null) { // jika hasil berupa tanggal spesifik
-      _terapkanTanggal(hasil.tanggal!); // terapkan tanggal itu
-    }
   }
 
   void _ubahJenis(TransactionType? j) { // ubah filter jenis transaksi
@@ -143,49 +117,55 @@ class _HistoryPageState extends State<HistoryPage> { // kelas state untuk Histor
     _umumkanHasil(); // umumkan hasilnya ke pembaca layar
   }
 
-  /// Tombol pemilih periode: ikon kalender + label + panah bawah.
-  Widget _buildTombolPeriode() { // bangun tombol pemilih periode
-    return Semantics( // info aksesibilitas untuk tombol ini
+  /// Sakelar dua pilihan periode: Hari Ini / Kemarin — menggantikan
+  /// dialog pemilih periode (preset minggu/bulan/semua + kalender),
+  /// sebab riwayat kini sengaja dibatasi ke dua hari terakhir saja.
+  Widget _buildTombolPeriode() { // bangun sakelar segmen dua pilihan periode
+    return Container(
+      constraints: const BoxConstraints(minHeight: 40), // tinggi minimum sakelar
+      decoration: BoxDecoration(
+        color: context.warnaKartu, // warna latar kartu
+        borderRadius: BorderRadius.circular(10), // sudut membulat
+        border: Border.all(color: context.warnaGaris), // garis tepi
+      ),
+      child: Row(
+        children: [
+          Expanded(child: _buildSegmenPeriode('Hari Ini', _RiwayatPeriode.hariIni)),
+          Container(width: 1, height: 22, color: context.warnaGaris), // pemisah antar segmen
+          Expanded(child: _buildSegmenPeriode('Kemarin', _RiwayatPeriode.kemarin)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSegmenPeriode(String label, _RiwayatPeriode p) { // bangun satu segmen (Hari Ini atau Kemarin)
+    final bool terpilih = _periode == p; // status apakah segmen ini yang sedang aktif
+    return Semantics( // info aksesibilitas untuk segmen ini
       button: true,
-      label: 'Pilih periode: $_labelPeriode', // label yang diucapkan pembaca layar
-      hint: 'Ketuk dua kali untuk memilih periode lewat kalender', // petunjuk aksi
-      onTap: _bukaPeriodeDialog, // aksi semantik saat diketuk
+      selected: terpilih,
+      label: label, // teks yang diucapkan pembaca layar
+      hint: terpilih ? null : 'Ketuk dua kali untuk memilih', // petunjuk aksi, kosong bila sudah aktif
+      onTap: () => _pilihPeriode(p), // aksi semantik saat diketuk
       excludeSemantics: true,
       child: InkWell( // efek ripple saat ditekan
-        onTap: _bukaPeriodeDialog, // buka dialog pemilih periode
-        borderRadius: BorderRadius.circular(10), // radius efek ripple
-        child: Container( // kotak tombol
-          constraints: const BoxConstraints(minHeight: 40), // tinggi minimum tombol
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          decoration: BoxDecoration( // tampilan kotak
-            color: context.warnaKartu, // warna latar kartu
-            borderRadius: BorderRadius.circular(10), // sudut membulat
-            border: Border.all(color: context.warnaGaris), // garis tepi
+        onTap: () => _pilihPeriode(p), // pindah ke periode ini
+        borderRadius: BorderRadius.circular(9),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          decoration: BoxDecoration(
+            color: terpilih ? Theme.of(context).colorScheme.primary : Colors.transparent, // isi latar jika aktif
+            borderRadius: BorderRadius.circular(9),
           ),
-          child: Row( // ikon + teks + panah sejajar
-            children: [
-              Icon(
-                Icons.calendar_month_outlined, // ikon kalender
-                size: 18,
-                color: context.warnaTeksMuted,
-              ),
-              const SizedBox(width: 8), // jarak horizontal
-              Expanded( // isi sisa ruang horizontal
-                child: Text(
-                  _labelPeriode, // teks label periode aktif
-                  overflow: TextOverflow.ellipsis, // potong dengan "..." jika kepanjangan
-                  style: AppTypography.labelSmall.copyWith(
-                    color: context.warnaTeksUtama,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 4), // jarak horizontal kecil
-              Icon(
-                Icons.keyboard_arrow_down_rounded, // ikon panah bawah
-                size: 18,
-                color: context.warnaTeksMuted,
-              ),
-            ],
+          alignment: Alignment.center,
+          child: Text(
+            label, // teks label segmen
+            overflow: TextOverflow.ellipsis, // potong dengan "..." jika kepanjangan
+            style: AppTypography.labelSmall.copyWith(
+              color: terpilih
+                  ? Theme.of(context).colorScheme.onPrimary
+                  : context.warnaTeksUtama,
+              fontWeight: terpilih ? FontWeight.w700 : FontWeight.w400,
+            ),
           ),
         ),
       ),
@@ -375,7 +355,6 @@ class _HistoryPageState extends State<HistoryPage> { // kelas state untuk Histor
     final double tinggiHeaderPeriode = // tinggi header periode, menyesuaikan skala teks
         MediaQuery.textScalerOf(context).scale(48.0).clamp(48.0, 96.0); // dibatasi antara 48 dan 96
 
-    final scheme = Theme.of(context).colorScheme; // ambil skema warna dari tema aktif
     return AnnotatedRegion<SystemUiOverlayStyle>( // atur tampilan status bar sistem
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent, // status bar transparan
@@ -385,30 +364,10 @@ class _HistoryPageState extends State<HistoryPage> { // kelas state untuk Histor
       ),
       child: Scaffold( // kerangka halaman (body, floating action button, dll)
       backgroundColor: Theme.of(context).scaffoldBackgroundColor, // warna latar sesuai tema
-      floatingActionButton: SizedBox( // bungkus FAB agar ukurannya tetap
-        width: 64,
-        height: 64,
-        child: FloatingActionButton( // tombol mengambang untuk catat suara
+      // VoiceFab menghilang sendiri saat Mode Suara dimatikan di Pengaturan.
+      floatingActionButton: VoiceFab(
         heroTag: 'fab_history', // tag unik agar tak bentrok dengan FAB halaman lain
         onPressed: _handleVoiceInput, // aksi saat tombol ditekan
-        backgroundColor: scheme.primary, // warna latar sesuai tema
-        elevation: 4, // tinggi bayangan tombol
-        shape: const CircleBorder(), // bentuk lingkaran
-        tooltip: 'Catat transaksi dengan suara', // teks bantuan saat ditekan lama
-        // Semantics eksplisit, bukan cuma mengandalkan tooltip.
-        // Tanpa label ini pembaca layar hanya menyebutnya "tombol"
-        // tanpa keterangan, tak terbedakan dari tombol tambah lain.
-        child: Semantics( // info aksesibilitas eksplisit untuk tombol ini
-          button: true, // beri tahu pembaca layar bahwa ini tombol
-          label: 'Catat transaksi dengan suara', // label yang diucapkan
-          excludeSemantics: true, // sembunyikan info semantik dari widget anak
-          child: Icon(
-            Icons.mic_rounded, // ikon mikrofon
-            color: scheme.onPrimary, // warna kontras di atas warna primary
-            size: 30, // ukuran ikon
-          ),
-        ),
-        ),
       ),
       body: SafeArea( // hindari area yang terpotong notch/status bar
         child: RefreshIndicator( // gestur tarik ke bawah untuk refresh data
@@ -553,8 +512,7 @@ class _HistoryPageState extends State<HistoryPage> { // kelas state untuk Histor
                         padding: const EdgeInsets.all(32),
                         child: Center(
                           child: Text( // pesan berbeda tergantung ada filter aktif atau belum
-                            _periode == PeriodeFilter.semua &&
-                                    _tanggalKhusus == null &&
+                            _periode == _RiwayatPeriode.hariIni &&
                                     _jenis == null &&
                                     _cariCtrl.text.isEmpty
                                 ? 'Belum ada catatan.\n'
@@ -645,353 +603,4 @@ class _PeriodeHeaderDelegate extends SliverPersistentHeaderDelegate { // delegat
 
   @override
   bool shouldRebuild(covariant _PeriodeHeaderDelegate oldDelegate) => true; // selalu bangun ulang saat berubah
-}
-
-
-/// Tombol filter berbentuk chip. Dipakai untuk preset periode di
-/// [_PeriodeDialog].
-class _Chip extends StatelessWidget { // tombol berbentuk chip untuk pilihan preset
-  const _Chip({
-    required this.label,
-    required this.terpilih,
-    required this.onTap,
-  });
-
-  final String label; // teks yang ditampilkan pada chip
-  final bool terpilih; // status apakah chip ini sedang dipilih
-  final VoidCallback onTap; // aksi saat chip diketuk
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics( // info aksesibilitas untuk chip ini
-      button: true,
-      selected: terpilih,
-      label: label,
-      // Tanpa onTap di sini, simpulnya diumumkan sebagai tombol tetapi
-      // tidak punya aksi yang bisa dijalankan TalkBack.
-      onTap: onTap, // aksi semantik saat diketuk
-      excludeSemantics: true,
-      child: InkWell( // efek ripple saat ditekan
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: Container( // kotak chip
-          constraints: const BoxConstraints(minHeight: 44), // tinggi minimum chip
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: terpilih // warna latar sesuai status pilih
-                ? Theme.of(context).colorScheme.primary
-                : context.warnaKartu,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: terpilih // warna garis tepi sesuai status pilih
-                  ? Theme.of(context).colorScheme.primary
-                  : context.warnaGaris,
-              // Ketebalan garis ikut membedakan, bukan hanya warna.
-              width: terpilih ? 2 : 1, // garis lebih tebal saat terpilih
-            ),
-          ),
-          // Bukan Center: di dalam Row/ListView horizontal, Align/Center
-          // menerima lebar TAK TERBATAS dari induknya sehingga otomatis
-          // menyusut mengikuti ukuran teks. Tapi di dalam Wrap, lebar
-          // yang diterima TERBATAS (sebesar lebar Wrap), dan Align/Center
-          // pada kondisi itu justru melebar mengisi seluruh ruang —
-          // itulah yang membuat setiap chip melebar sepanjang layar
-          // begitu filter periode/jenis dipindah ke Wrap.
-          //
-          // Row(mainAxisSize: min) selalu menyusut mengikuti lebar
-          // teksnya sendiri di kedua jenis induk, sekaligus tetap
-          // menengahkan teks secara vertikal (lewat crossAxisAlignment
-          // bawaan) saat minHeight kartu lebih besar dari kebutuhan teks.
-          child: Row( // baris agar lebar chip menyusut mengikuti teks
-            mainAxisSize: MainAxisSize.min, // ukuran seminimal isinya
-            children: [
-              Text(
-                label, // teks chip
-                style: terpilih // gaya teks berbeda saat terpilih
-                    ? AppTypography.labelMedium.copyWith(
-                        color: Theme.of(context).colorScheme.onPrimary,
-                        fontWeight: FontWeight.w700,
-                      )
-                    : AppTypography.labelMedium.copyWith(
-                        color: context.warnaTeksUtama,
-                      ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Hasil pilihan dari [_PeriodeDialog]: salah satu dari preset relatif
-/// atau tanggal spesifik, tidak pernah keduanya sekaligus.
-class _PeriodeHasil { // pembawa hasil pilihan dari dialog periode
-  final PeriodeFilter? preset; // diisi jika pengguna memilih preset
-  final DateTime? tanggal; // diisi jika pengguna memilih tanggal spesifik
-
-  const _PeriodeHasil.preset(PeriodeFilter p) // konstruktor bernama untuk hasil preset
-      : preset = p,
-        tanggal = null;
-
-  const _PeriodeHasil.tanggal(DateTime t) // konstruktor bernama untuk hasil tanggal
-      : preset = null,
-        tanggal = t;
-}
-
-/// Dialog pemilih periode: preset cepat (Hari ini/Minggu ini/Bulan
-/// ini/Semua) di atas, dan kalender bulanan di bawah untuk memilih
-/// tanggal tertentu di masa lalu — supaya rentang yang sedang dilihat
-/// selalu jelas, bukan sekadar label abstrak.
-class _PeriodeDialog extends StatefulWidget { // dialog pemilih periode (preset & kalender)
-  final PeriodeFilter periodeAktif; // preset yang sedang aktif saat dialog dibuka
-  final DateTime? tanggalAktif; // tanggal spesifik yang sedang aktif, jika ada
-
-  const _PeriodeDialog({
-    required this.periodeAktif,
-    required this.tanggalAktif,
-  });
-
-  @override
-  State<_PeriodeDialog> createState() => _PeriodeDialogState(); // buat state terkait
-}
-
-class _PeriodeDialogState extends State<_PeriodeDialog> {
-  late DateTime _bulanTampil; // bulan yang sedang ditampilkan di kalender dialog
-
-  static const List<String> _namaHari = [ // singkatan nama hari untuk header kalender
-    'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min',
-  ];
-  static const List<String> _namaBulan = [ // nama bulan lengkap, index 0 kosong (1=Jan, dst)
-    '', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    // Kalender terbuka menampilkan bulan dari tanggal yang sedang
-    // aktif (kalau ada), bukan selalu bulan sekarang — supaya
-    // konsisten dengan apa yang sedang dilihat pengguna.
-    final DateTime acuan = widget.tanggalAktif ?? DateTime.now(); // acuan bulan awal kalender
-    _bulanTampil = DateTime(acuan.year, acuan.month); // set bulan awal yang ditampilkan
-  }
-
-  bool get _bulanTampilAdalahSekarang { // cek apakah bulan yang ditampilkan adalah bulan sekarang
-    final DateTime now = DateTime.now();
-    return _bulanTampil.year == now.year && _bulanTampil.month == now.month;
-  }
-
-  void _gantiBulan(int delta) { // pindah tampilan kalender maju/mundur sejumlah bulan
-    setState(() {
-      _bulanTampil = DateTime(_bulanTampil.year, _bulanTampil.month + delta); // hitung bulan baru
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog( // bungkus konten sebagai dialog modal
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), // sudut dialog membulat
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min, // tinggi seminimal isinya
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Pilih Periode', // judul dialog
-              style: AppTypography.titleMedium.copyWith(
-                color: context.warnaTeksUtama,
-              ),
-            ),
-            const SizedBox(height: 14), // jarak vertikal
-
-            // ── Preset cepat ─────────────────────────────────────
-            Wrap( // susunan chip yang bisa turun baris otomatis
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final PeriodeFilter p in PeriodeFilter.values) // ulangi untuk tiap opsi preset
-                  _Chip( // chip satu preset periode
-                    label: p.label, // teks label preset
-                    terpilih: // chip aktif jika tanggal khusus kosong & preset cocok
-                        widget.tanggalAktif == null && widget.periodeAktif == p,
-                    onTap: () => // pilih preset ini dan tutup dialog dgn hasilnya
-                        Navigator.pop(context, _PeriodeHasil.preset(p)),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 18), // jarak vertikal
-            Divider(height: 1, color: context.warnaGaris), // garis pemisah bagian
-            const SizedBox(height: 14), // jarak vertikal
-
-            // ── Atau tanggal spesifik ────────────────────────────
-            Text(
-              'Atau pilih tanggal', // label bagian kalender
-              style: AppTypography.labelSmall.copyWith(
-                color: context.warnaTeksUtama,
-              ),
-            ),
-            const SizedBox(height: 8), // jarak vertikal
-
-            Row( // baris navigasi ganti bulan pada kalender
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Semantics(
-                  button: true,
-                  label: 'Bulan sebelumnya',
-                  onTap: () => _gantiBulan(-1), // aksi semantik: mundur satu bulan
-                  excludeSemantics: true,
-                  child: IconButton( // tombol bulan sebelumnya
-                    icon: const Icon(Icons.chevron_left_rounded),
-                    onPressed: () => _gantiBulan(-1), // mundur satu bulan
-                  ),
-                ),
-                Flexible(
-                  child: Text(
-                    '${_namaBulan[_bulanTampil.month]} ${_bulanTampil.year}', // label bulan & tahun yang ditampilkan
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: context.warnaTeksUtama,
-                    ),
-                  ),
-                ),
-                Semantics(
-                  button: true,
-                  label: 'Bulan berikutnya',
-                  enabled: !_bulanTampilAdalahSekarang, // nonaktif jika sudah di bulan sekarang
-                  onTap:
-                      _bulanTampilAdalahSekarang ? null : () => _gantiBulan(1), // maju satu bulan jika diizinkan
-                  excludeSemantics: true,
-                  child: IconButton( // tombol bulan berikutnya
-                    icon: const Icon(Icons.chevron_right_rounded),
-                    // Bulan depan belum punya transaksi apa pun, jadi
-                    // navigasi ke sana dinonaktifkan.
-                    onPressed:
-                        _bulanTampilAdalahSekarang ? null : () => _gantiBulan(1), // maju satu bulan jika diizinkan
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4), // jarak vertikal kecil
-
-            Row( // baris header nama-nama hari
-              children: [
-                for (final String h in _namaHari) // ulangi untuk tiap nama hari singkat
-                  Expanded(
-                    child: Center(
-                      child: Text(
-                        h, // nama hari singkat
-                        style: AppTypography.captionSmall.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: context.warnaTeksMuted,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 4), // jarak vertikal kecil
-
-            _buildGridTanggal(), // grid tanggal-tanggal dalam bulan yang ditampilkan
-
-            const SizedBox(height: 12), // jarak vertikal
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton( // tombol batal, tutup dialog tanpa hasil
-                onPressed: () => Navigator.pop(context), // tutup dialog tanpa mengirim hasil
-                child: Text(
-                  'Batal',
-                  style: TextStyle(color: context.warnaTeksMuted),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGridTanggal() { // bangun grid tanggal-tanggal dalam bulan yang ditampilkan
-    final DateTime firstDay = DateTime(_bulanTampil.year, _bulanTampil.month, 1); // tanggal 1 bulan yang ditampilkan
-    final int jumlahHari = // jumlah hari dalam bulan yang ditampilkan
-        DateTime(_bulanTampil.year, _bulanTampil.month + 1, 0).day;
-    // weekday: Senin = 1 ... Minggu = 7, sehingga offset 0 saat tanggal
-    // 1 jatuh pada hari Senin.
-    final int offset = firstDay.weekday - 1; // jumlah sel kosong sebelum tanggal 1
-
-    final DateTime now = DateTime.now(); // tanggal & waktu sekarang
-    final DateTime hariIni = DateTime(now.year, now.month, now.day); // tanggal hari ini tanpa jam
-    final DateTime? terpilih = widget.tanggalAktif; // tanggal yang sedang terpilih, jika ada
-
-    return GridView.count( // grid 7 kolom (hari dalam seminggu)
-      crossAxisCount: 7, // 7 kolom sesuai jumlah hari dalam seminggu
-      shrinkWrap: true, // tinggi menyesuaikan isi
-      physics: const NeverScrollableScrollPhysics(), // tidak bisa digulir sendiri
-      mainAxisSpacing: 4,
-      crossAxisSpacing: 4,
-      children: [
-        for (int i = 0; i < offset; i++) const SizedBox.shrink(), // sel kosong sebelum tanggal 1
-        for (int d = 1; d <= jumlahHari; d++) _buildHari(d, hariIni, terpilih), // sel tiap tanggal dalam bulan
-      ],
-    );
-  }
-
-  Widget _buildHari(int hari, DateTime hariIni, DateTime? terpilih) { // bangun satu sel tanggal pada grid
-    final DateTime tanggal = DateTime(_bulanTampil.year, _bulanTampil.month, hari); // tanggal penuh sel ini
-    final bool isHariIni = tanggal == hariIni; // cek apakah sel ini adalah hari ini
-    final bool isTerpilih = terpilih != null && // cek apakah sel ini adalah tanggal terpilih
-        terpilih.year == tanggal.year &&
-        terpilih.month == tanggal.month &&
-        terpilih.day == tanggal.day;
-    // Transaksi tidak mungkin ada di masa depan, jadi tanggal itu
-    // dinonaktifkan alih-alih ditampilkan seolah bisa dipilih.
-    final bool isMasaDepan = tanggal.isAfter(hariIni); // cek apakah tanggal ini di masa depan
-
-    return Semantics(
-      button: !isMasaDepan, // hanya berperan tombol jika bukan masa depan
-      selected: isTerpilih,
-      label: '$hari ${_namaBulan[_bulanTampil.month]} ${_bulanTampil.year}' // label lengkap tanggal untuk pembaca layar
-          '${isHariIni ? ', hari ini' : ''}'
-          '${isTerpilih ? ', dipilih' : ''}',
-      onTap: isMasaDepan // nonaktifkan aksi semantik jika masa depan
-          ? null
-          : () => Navigator.pop(context, _PeriodeHasil.tanggal(tanggal)), // pilih tanggal ini & tutup dialog
-      excludeSemantics: true,
-      child: InkWell( // efek ripple saat ditekan
-        onTap: isMasaDepan // nonaktifkan tombol jika masa depan
-            ? null
-            : () => Navigator.pop(context, _PeriodeHasil.tanggal(tanggal)), // pilih tanggal ini & tutup dialog
-        borderRadius: BorderRadius.circular(8),
-        child: Container( // kotak visual sel tanggal
-          decoration: BoxDecoration(
-            color: isTerpilih // warna latar terisi jika terpilih
-                ? Theme.of(context).colorScheme.primary
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            border: isHariIni && !isTerpilih // beri garis tepi khusus jika hari ini & belum terpilih
-                ? Border.all(
-                    color: Theme.of(context).colorScheme.primary, width: 1.5)
-                : null,
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            '$hari', // angka tanggal
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: // tebal jika terpilih atau hari ini
-                  isTerpilih || isHariIni ? FontWeight.w700 : FontWeight.w400,
-              color: isMasaDepan // warna teks pudar jika masa depan
-                  ? context.warnaTeksMuted.withValues(alpha: 0.4)
-                  : (isTerpilih
-                      ? Theme.of(context).colorScheme.onPrimary
-                      : context.warnaTeksUtama),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }

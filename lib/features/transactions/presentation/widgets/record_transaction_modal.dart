@@ -3,6 +3,7 @@ import 'package:flutter/semantics.dart'; // untuk pengumuman ke pembaca layar
 import 'package:flutter/services.dart'; // untuk pembatas input (FilteringTextInputFormatter)
 
 import '../../../../core/navigation/app_route.dart'; // helper pembuat rute navigasi
+import '../../../../core/services/keamanan_controller.dart'; // sakelar Mode Suara: sembunyikan kartu suara saat mati
 import '../../../../core/theme/app_typography.dart'; // gaya teks standar aplikasi
 import '../../../../core/theme/theme_extensions.dart'; // ekstensi warna kontekstual (mis. context.warnaKartu)
 import '../../../../core/utils/currency_formatter.dart'; // pengubah angka jadi teks rupiah/lisan
@@ -585,64 +586,82 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
-
-              Semantics(
-                button: true,
-                label: 'Catat transaksi dengan suara',
-                onTap: _pakaiSuara,
-                excludeSemantics: true,
-                child: InkWell(
-                  onTap: _pakaiSuara, // mulai pengenalan suara dan isi form otomatis
-                  borderRadius: BorderRadius.circular(14),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: context.latarMasuk,
-                      borderRadius: BorderRadius.circular(14),
-                      // Tanpa garis tepi, kartu berlatar gelap ini nyaris
-                      // tak terlihat sebagai kartu di atas halaman yang
-                      // juga gelap — beda dari mode terang, di sana
-                      // warna mint mudanya sudah cukup menonjol sendiri.
-                      border: Border.all(color: context.warnaMasuk, width: 1.5),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: context.warnaKartu,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                                color: context.warnaMasuk, width: 1.5),
-                          ),
-                          child: Icon(
-                            Icons.mic_none,
-                            color: context.warnaMasuk,
-                            size: 22,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Catat transaksi dengan Suara\n'
-                            'Ucapkan transaksi Anda, AI akan membantu '
-                            'mengisi data secara otomatis.',
-                            style: TextStyle(
-                              fontSize: 15,
-                              color: context.warnaTeksUtama,
-                              height: 1.4,
+              // Seluruh kartu (dan jarak di sekitarnya) hilang bersamaan
+              // saat Mode Suara dimatikan di Pengaturan — bukan cuma
+              // menonaktifkan ketukannya, supaya tidak ada kartu yang
+              // terlihat tapi tak berfungsi apa-apa saat ditekan.
+              ValueListenableBuilder<bool>(
+                valueListenable: KeamananController.instance.suaraAktif,
+                builder: (context, suaraAktif, _) {
+                  if (!suaraAktif) return const SizedBox.shrink();
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 18),
+                      Semantics(
+                        button: true,
+                        label: 'Catat transaksi dengan suara',
+                        onTap: _pakaiSuara,
+                        excludeSemantics: true,
+                        child: InkWell(
+                          onTap: _pakaiSuara, // mulai pengenalan suara dan isi form otomatis
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: context.latarMasuk,
+                              borderRadius: BorderRadius.circular(14),
+                              // Tanpa garis tepi, kartu berlatar gelap ini nyaris
+                              // tak terlihat sebagai kartu di atas halaman yang
+                              // juga gelap — beda dari mode terang, di sana
+                              // warna mint mudanya sudah cukup menonjol sendiri.
+                              border: Border.all(color: context.warnaMasuk, width: 1.5),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: context.warnaKartu,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: context.warnaMasuk, width: 1.5),
+                                  ),
+                                  child: Icon(
+                                    Icons.mic_none,
+                                    color: context.warnaMasuk,
+                                    size: 22,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'Catat transaksi dengan Suara\n'
+                                    'Ucapkan transaksi Anda, AI akan membantu '
+                                    'mengisi data secara otomatis.',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      color: context.warnaTeksUtama,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
+                      ),
+                    ],
+                  );
+                },
               ),
+              // Jarak tetap ke tombol Simpan — tidak boleh ikut hilang
+              // bersama kartu suara di atas saat Mode Suara mati, sebab
+              // tanpa ini "Metode bayar" akan menempel rapat ke tombol
+              // Simpan begitu kartu suara tidak ditampilkan sama sekali.
               const SizedBox(height: 20),
 
               SizedBox(
