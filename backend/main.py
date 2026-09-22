@@ -56,11 +56,18 @@ Dari teks yang diberikan, tentukan:
   pembayaran, dapat pemasukan), "keluar" jika ini uang yang dikeluarkan/
   dibelanjakan (mis. beli, bayar, keluar biaya). null jika benar-benar
   tidak jelas arahnya.
-- kategori: PILIH SATU dari daftar kategori untuk jenis yang kamu tentukan
-  di atas (kategori_masuk jika jenis masuk, kategori_keluar jika jenis
-  keluar), yang paling cocok dengan isi ucapan. null jika tidak ada yang
-  cocok sama sekali atau jenis tidak jelas. Jangan mengarang kategori di
-  luar daftar yang diberikan.
+- kategori: cari kategori yang paling cocok dari daftar kategori untuk
+  jenis yang kamu tentukan di atas (kategori_masuk jika jenis masuk,
+  kategori_keluar jika jenis keluar). Jika salah satu kategori di daftar
+  itu jelas cocok dengan isi ucapan, PILIH PERSIS nama itu apa adanya
+  (jangan ubah ejaan/kapitalisasinya). Jika TIDAK ADA kategori di daftar
+  yang cocok, tapi ucapan cukup jelas menyebutkan jenis barang/
+  aktivitasnya (mis. "bayar listrik", "jual kerajinan tangan"), buat
+  nama kategori baru yang singkat (satu sampai tiga kata, format judul,
+  mis. "Listrik", "Kerajinan Tangan") merangkum itu — kategori baru ini
+  akan otomatis ditambahkan ke daftar kategori pengguna. null hanya jika
+  jenis transaksinya sendiri tidak jelas, atau ucapan sama sekali tidak
+  memberi info soal kategori apa pun.
 - metode: "tunai" jika ucapan menyebut uang tunai/cash/kontan, atau
   "non tunai" jika menyebut transfer, QRIS, kartu debit/kredit, e-wallet
   (mis. OVO, GoPay, Dana), atau metode nontunai lain. null jika metode
