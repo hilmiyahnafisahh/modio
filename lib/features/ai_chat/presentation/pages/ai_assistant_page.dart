@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart'; // Widget-widget dasar Flutter (Material Design)
 import '../../../../core/theme/theme_extensions.dart'; // Extension untuk akses warna sesuai tema
+import '../../../../core/utils/accessibility_helper.dart'; // Untuk membacakan balasan AI lewat screen reader
 import '../widgets/voice_input_bar.dart'; // Widget bar input teks + suara
 import '../widgets/chat_bubble.dart'; // Widget gelembung pesan chat
 
@@ -47,13 +48,15 @@ class _AiAssistantPageState extends State<AiAssistantPage> { // Kelas state yang
       // Simulasi balasan AI (dummy)
       Future.delayed(const Duration(milliseconds: 800), () { // Tunda balasan AI seolah sedang berpikir
         if (mounted) { // Pastikan widget masih ada di layar sebelum setState
-          setState(() { // Perbarui state dengan balasan AI
-            _messages.add(const ChatMessage(
-              text: 'Terima kasih atas pertanyaannya! '
-                    'Fitur AI sedang dalam pengembangan.',
-              isUser: false, // Pesan ini dari AI
-            ));
-          });
+          const ChatMessage balasan = ChatMessage(
+            text: 'Terima kasih atas pertanyaannya! '
+                  'Fitur AI sedang dalam pengembangan.',
+            isUser: false, // Pesan ini dari AI
+          );
+          setState(() => _messages.add(balasan)); // Perbarui state dengan balasan AI
+          // Fokus TalkBack tetap di kolom input, jadi balasan baru tidak
+          // akan terbaca kalau tidak diumumkan.
+          AccessibilityHelper.announce(context, 'Asisten AI: ${balasan.text}');
         }
       });
     });
@@ -114,6 +117,9 @@ class _AiAssistantPageState extends State<AiAssistantPage> { // Kelas state yang
             onSend: _sendMessage, // Fungsi dipanggil saat pesan dikirim
             onVoice: () {
               // TODO: implementasi voice-to-text
+              // Sementara belum ada, beri tahu pengguna alih-alih diam saja.
+              AccessibilityHelper.announce(context,
+                  'Tanya dengan suara belum tersedia. Silakan ketik pertanyaan Anda.');
             },
           ),
         ],

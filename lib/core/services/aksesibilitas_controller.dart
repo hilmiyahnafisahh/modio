@@ -87,4 +87,30 @@ class AksesibilitasController { // Kelas pengatur opsi aksesibilitas seluruh apl
   void getar() { // Memicu getaran singkat jika opsi getaran aktif
     if (getaran.value) HapticFeedback.lightImpact(); // Getar ringan hanya kalau pengguna mengizinkan getaran
   }
+
+  // ── Pola getaran hasil tindakan ──────────────────────────────────
+  // Hanya ada dua pola, dipakai sama persis di seluruh aplikasi:
+  //   • Berhasil → 1 getaran pendek
+  //   • Gagal    → 2 getaran pendek berturut-turut
+  // Pola dibedakan dari JUMLAH getaran, bukan kekuatannya. Beda
+  // kekuatan (sedang vs kuat) sulit dirasakan di banyak HP, sedangkan
+  // jumlah getaran mudah dihitung. Getaran hanya pelengkap: setiap
+  // pemanggil tetap wajib mengumumkan status lewat pembaca layar.
+
+  /// Jeda antar dua getaran pola gagal. Cukup panjang untuk terasa
+  /// sebagai dua ketukan terpisah, cukup pendek untuk terasa satu pola.
+  static const Duration jedaPolaGagal = Duration(milliseconds: 180);
+
+  /// Tindakan berhasil (PIN benar, transaksi tersimpan, dsb).
+  void getarBerhasil() { // 1 getaran pendek
+    if (getaran.value) HapticFeedback.mediumImpact();
+  }
+
+  /// Tindakan gagal atau input tidak valid.
+  Future<void> getarGagal() async { // 2 getaran pendek berturut-turut
+    if (!getaran.value) return; // Hormati sakelar Getaran di pengaturan
+    await HapticFeedback.heavyImpact();
+    await Future<void>.delayed(jedaPolaGagal);
+    await HapticFeedback.heavyImpact();
+  }
 }

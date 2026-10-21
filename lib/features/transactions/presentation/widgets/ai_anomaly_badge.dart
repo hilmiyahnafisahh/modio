@@ -30,10 +30,10 @@ class AiAnomalyBadge extends StatelessWidget { // Widget badge peringatan, tanpa
   Widget build(BuildContext context) { // Membangun tampilan badge
     final Color bgColor = level == AnomalyLevel.alert
         ? AppColors.tertiary50 // Latar merah muda untuk level alert
-        : const Color(0xFFFFFBEB); // amber muda
+        : AppColors.amber50; // amber muda
     final Color iconColor = level == AnomalyLevel.alert
-        ? AppColors.tertiary500 // Warna merah untuk level alert
-        : const Color(0xFFB45309); // amber gelap
+        ? AppColors.tertiary700 // Merah 8,4:1 di atas tertiary50 (tertiary500 hanya 3,6:1)
+        : AppColors.amber700; // Amber 7,4:1 di atas amber50 (#B45309 hanya 4,9:1)
     final IconData icon = level == AnomalyLevel.alert
         ? Icons.error_outline // Ikon error untuk level alert
         : Icons.warning_amber_outlined; // Ikon peringatan untuk level warning
@@ -57,7 +57,7 @@ class AiAnomalyBadge extends StatelessWidget { // Widget badge peringatan, tanpa
             child: Text(
               message,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 14,
                 color: iconColor,
                 fontWeight: FontWeight.w500,
               ),

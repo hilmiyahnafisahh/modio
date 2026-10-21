@@ -2,6 +2,7 @@ import 'package:flutter/material.dart'; // widget dan tema dasar Flutter
 import 'package:flutter/semantics.dart'; // untuk pengumuman ke pembaca layar
 import 'package:flutter/services.dart'; // untuk pembatas input (FilteringTextInputFormatter)
 
+import '../../../../core/services/aksesibilitas_controller.dart'; // Pola getaran berhasil/gagal
 import '../../../../core/navigation/app_route.dart'; // helper pembuat rute navigasi
 import '../../../../core/services/keamanan_controller.dart'; // sakelar Mode Suara: sembunyikan kartu suara saat mati
 import '../../../../core/theme/app_typography.dart'; // gaya teks standar aplikasi
@@ -305,6 +306,7 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
         narasiHasil,
         Directionality.of(context),
       );
+      AksesibilitasController.instance.getarBerhasil(); // pola berhasil: 1 getaran pendek
       Navigator.pop(context, true); // tutup modal, beri tahu pemanggil bahwa berhasil
     } catch (e) {
       if (!mounted) return; // batalkan bila widget sudah dilepas
@@ -350,7 +352,10 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
     );
   }
 
+  /// Pesan kesalahan (validasi gagal atau simpan gagal). Semua
+  /// pemanggilnya kondisi gagal, jadi pola getaran gagal dipasang di sini.
   void _pesan(String teks) {
+    AksesibilitasController.instance.getarGagal(); // pola gagal: 2 getaran pendek
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(teks, style: const TextStyle(fontSize: 16)),
@@ -739,11 +744,11 @@ class _RecordTransactionModalState extends State<RecordTransactionModal> {
       ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: context.warnaGaris),
+        borderSide: BorderSide(color: context.warnaGarisInput),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: context.warnaGaris),
+        borderSide: BorderSide(color: context.warnaGarisInput),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),

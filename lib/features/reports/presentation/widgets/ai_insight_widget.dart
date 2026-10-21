@@ -7,11 +7,12 @@ import '../../../../core/theme/theme_extensions.dart'; // Extension untuk akses 
 ///
 /// Menampilkan satu poin ringkasan keuangan.
 ///
-/// CATATAN PENTING: isi kartu ini dirakit dari template berisi angka
-/// hasil perhitungan basis data, bukan dibangkitkan model bahasa.
-/// Angka pada laporan keuangan tidak boleh mengandung kemungkinan
-/// kekeliruan, karena pengguna tunanetra tidak punya cara memeriksa
-/// ulang secara visual.
+/// CATATAN PENTING: angka di kartu ini tidak pernah dibangkitkan model
+/// bahasa. Angka pada laporan keuangan tidak boleh mengandung
+/// kemungkinan kekeliruan, karena pengguna tunanetra tidak punya cara
+/// memeriksa ulang secara visual. Kartu ini juga dipakai untuk saran
+/// AI (lihat ai_analysis_sheet.dart), tetapi backend membuang setiap
+/// saran yang menyebut angka sebelum dikirim ke aplikasi.
 /// ─────────────────────────────────────────────────────────────────
 
 class AiInsightWidget extends StatelessWidget { // Widget kartu ringkasan, tanpa state internal

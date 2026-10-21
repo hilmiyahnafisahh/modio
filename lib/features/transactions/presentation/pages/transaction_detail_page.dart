@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart'; // Import komponen UI utama Flutter
 import 'package:flutter/semantics.dart'; // Import untuk mengirim pengumuman ke pembaca layar (aksesibilitas)
 
+import '../../../../core/services/aksesibilitas_controller.dart'; // Pola getaran berhasil/gagal
 import '../../../../core/theme/app_typography.dart'; // Kumpulan gaya teks standar aplikasi
 import '../../../../core/theme/theme_extensions.dart'; // Ekstensi context untuk warna tema
 import '../../../../core/utils/currency_formatter.dart'; // Fungsi bantu format angka jadi mata uang & tanggal
@@ -134,9 +135,11 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> { // Kela
         'Transaksi dihapus.',
         Directionality.of(context),
       );
+      AksesibilitasController.instance.getarBerhasil(); // Pola berhasil: 1 getaran pendek
       Navigator.pop(context, true); // Tutup halaman detail, kembalikan true agar halaman riwayat memuat ulang
     } catch (e) { // Jika penghapusan gagal
       if (!mounted) return; // Batalkan jika halaman sudah ditutup
+      AksesibilitasController.instance.getarGagal(); // Pola gagal: 2 getaran pendek
       ScaffoldMessenger.of(context).showSnackBar( // Tampilkan notifikasi kecil di bawah layar
         const SnackBar( // Isi notifikasi kegagalan
           content: Text('Transaksi belum bisa dihapus. Coba lagi.'),

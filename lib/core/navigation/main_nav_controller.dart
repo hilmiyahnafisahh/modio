@@ -88,7 +88,7 @@ VoiceNavTarget? deteksiPerintahNavigasi(String teksAsli) { // Deteksi tujuan nav
 /// halaman yang dimaksud, tanpa perlu meraba-raba UI dulu.
 String labelHalaman(VoiceNavTarget target) => switch (target) { // Pemetaan tujuan ke label yang dibacakan
       VoiceNavTarget.dashboard => 'Dashboard',
-      VoiceNavTarget.riwayat => 'Riwayat',
+      VoiceNavTarget.riwayat => 'Transaksi', // sama dengan nama tab & judul halaman
       VoiceNavTarget.laporan => 'Laporan',
       VoiceNavTarget.profil => 'Profil',
       VoiceNavTarget.aiChat => 'Asisten AI',

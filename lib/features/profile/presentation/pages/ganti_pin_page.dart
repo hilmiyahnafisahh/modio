@@ -129,6 +129,7 @@ class _GantiPinPageState extends State<GantiPinPage> { // Kelas State: menyimpan
               ? 'Terlalu banyak percobaan. Coba lagi dalam $kunci detik.' // Pesan penguncian
               : 'PIN saat ini tidak sesuai'; // Pesan PIN salah biasa
         });
+        AksesibilitasController.instance.getarGagal(); // Pola gagal: 2 getaran pendek
         if (kunci > 0) _jalankanHitungMundur(); // Mulai hitung mundur tampilan jika sedang terkunci
         return; // Hentikan proses, jangan lanjut ke langkah berikutnya
       }
@@ -145,6 +146,7 @@ class _GantiPinPageState extends State<GantiPinPage> { // Kelas State: menyimpan
           _pins[1] = ''; // Kosongkan input agar diketik ulang
           _errorMessage = galat; // Tampilkan alasan penolakan dari repository
         });
+        AksesibilitasController.instance.getarGagal(); // Pola gagal: 2 getaran pendek
         return; // Hentikan proses, jangan lanjut
       }
     }
@@ -157,6 +159,7 @@ class _GantiPinPageState extends State<GantiPinPage> { // Kelas State: menyimpan
           _pins[2] = ''; // Kosongkan input konfirmasi
           _errorMessage = 'Konfirmasi PIN tidak cocok'; // Pesan penjelas
         });
+        AksesibilitasController.instance.getarGagal(); // Pola gagal: 2 getaran pendek
         return; // Hentikan proses
       }
       // Simpan PIN baru ke database
@@ -164,6 +167,7 @@ class _GantiPinPageState extends State<GantiPinPage> { // Kelas State: menyimpan
       await _repo.simpanPin(_pins[1]); // Simpan PIN baru ke database lewat repository
       if (!mounted) return; // Batalkan jika halaman sudah ditutup
       setState(() => _isChecking = false); // Sembunyikan indikator loading
+      AksesibilitasController.instance.getarBerhasil(); // Pola berhasil: 1 getaran pendek
       _onSuccess(); // Tampilkan dialog sukses
       return; // Selesai, tidak perlu lanjut ke kode di bawah
     }

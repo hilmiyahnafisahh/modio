@@ -150,11 +150,11 @@ class AppTheme {
         hintStyle: const TextStyle(fontSize: 16, color: AppColors.textMuted),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.divider), // garis tepi bawaan
+          borderSide: const BorderSide(color: AppColors.inputBorder), // garis tepi bawaan, ≥ 3:1 (WCAG 1.4.11)
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.divider), // garis tepi saat tidak fokus
+          borderSide: const BorderSide(color: AppColors.inputBorder), // garis tepi saat tidak fokus
         ),
         // Indikator fokus tebal. Garis tipis sulit terlihat pengguna
         // low vision saat berpindah antar isian.
@@ -341,11 +341,11 @@ class AppTheme {
             const TextStyle(fontSize: 16, color: AppColors.darkTextMuted),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.darkDivider),
+          borderSide: const BorderSide(color: AppColors.darkInputBorder),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.darkDivider),
+          borderSide: const BorderSide(color: AppColors.darkInputBorder),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),

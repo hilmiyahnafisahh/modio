@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart'; // Import komponen UI utama Flutter
+import '../../../../core/services/aksesibilitas_controller.dart'; // Pola getaran berhasil/gagal
 import '../../../../core/theme/app_colors.dart'; // Palet warna dasar aplikasi
 import '../../../../core/theme/theme_extensions.dart'; // Ekstensi context untuk warna tema
 import '../../../../core/services/profile_update_service.dart'; // Service notifikasi perubahan profil ke halaman lain
@@ -27,6 +28,13 @@ class _InformasiProfilPageState extends State<InformasiProfilPage> { // Kelas St
   final _jenisUsahaCtrl = TextEditingController(); // Controller input untuk field jenis usaha
   final _alamatCtrl     = TextEditingController(); // Controller input untuk field alamat
 
+  // Satu FocusNode per controller, dibuat saat pertama dibutuhkan. Dipakai
+  // agar seluruh baris field (bukan hanya garis teks setinggi ±20 dp)
+  // bisa diketuk untuk mulai mengetik — target sentuh minimum 44 dp.
+  final Map<TextEditingController, FocusNode> _focusNodes = {};
+  FocusNode _focusUntuk(TextEditingController c) =>
+      _focusNodes.putIfAbsent(c, FocusNode.new); // Ambil atau buat FocusNode milik controller ini
+
   final _repo = ProfileRepository.instance; // Objek singleton untuk membaca/menyimpan data profil
 
   @override
@@ -43,6 +51,9 @@ class _InformasiProfilPageState extends State<InformasiProfilPage> { // Kelas St
     _namaUsahaCtrl.dispose(); // Bersihkan controller nama usaha
     _jenisUsahaCtrl.dispose(); // Bersihkan controller jenis usaha
     _alamatCtrl.dispose(); // Bersihkan controller alamat
+    for (final FocusNode node in _focusNodes.values) {
+      node.dispose(); // Bersihkan FocusNode tiap field
+    }
     super.dispose(); // Panggil pembersihan bawaan Flutter
   }
 
@@ -81,6 +92,7 @@ class _InformasiProfilPageState extends State<InformasiProfilPage> { // Kelas St
       // Notifikasi ke dashboard dan halaman lain bahwa profil telah diperbarui
       ProfileUpdateService().notifyProfileUpdated(); // Beri tahu bagian lain aplikasi agar ikut memuat ulang data
       if (!mounted) return; // Batalkan jika halaman sudah ditutup sebelum menampilkan snackbar
+      AksesibilitasController.instance.getarBerhasil(); // Pola berhasil: 1 getaran pendek
       ScaffoldMessenger.of(context).showSnackBar( // Tampilkan notifikasi kecil di bawah layar
         SnackBar( // Isi notifikasi sukses
           content: Text(
@@ -97,6 +109,7 @@ class _InformasiProfilPageState extends State<InformasiProfilPage> { // Kelas St
     } catch (_) { // Jika terjadi error saat menyimpan
       if (!mounted) return; // Batalkan jika halaman sudah ditutup
       setState(() => _isSaving = false); // Matikan status sedang menyimpan meski gagal
+      AksesibilitasController.instance.getarGagal(); // Pola gagal: 2 getaran pendek
       ScaffoldMessenger.of(context).showSnackBar( // Tampilkan notifikasi kegagalan
         SnackBar( // Isi notifikasi gagal
           content: Text(
@@ -262,13 +275,16 @@ class _InformasiProfilPageState extends State<InformasiProfilPage> { // Kelas St
   }
 
   Widget _buildSectionLabel(String label) { // Widget bantu untuk judul kecil tiap bagian form
-    return Text(
-      label, // Teks judul bagian, misal "DATA PRIBADI"
-      style: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-        color: context.warnaTeksMuted, // Warna redup karena hanya label kecil
-        letterSpacing: 0.8, // Jarak antar huruf sedikit lebar, gaya label kapital
+    return Semantics( // Tandai sebagai judul agar bisa dilompati lewat navigasi Judul TalkBack
+      header: true,
+      child: Text(
+        label, // Teks judul bagian, misal "DATA PRIBADI"
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: context.warnaTeksMuted, // Warna redup karena hanya label kecil
+          letterSpacing: 0.8, // Jarak antar huruf sedikit lebar, gaya label kapital
+        ),
       ),
     );
   }
@@ -286,7 +302,16 @@ class _InformasiProfilPageState extends State<InformasiProfilPage> { // Kelas St
           final isLast = index == fields.length - 1; // Menandai apakah ini field terakhir (untuk garis pemisah)
           return Column( // Bungkus satu field beserta garis pemisahnya
             children: [
-              Padding( // Jarak di sekeliling isi satu baris field
+              // MergeSemantics menyatukan label kecil dengan kolom input /
+              // nilainya, sehingga TalkBack membaca "Nama Lengkap, kotak
+              // edit, Budi" — bukan "kotak edit" tanpa nama.
+              MergeSemantics(
+              child: GestureDetector( // Ketuk di mana pun pada baris untuk fokus ke kolom input
+                behavior: HitTestBehavior.opaque, // Area kosong (padding) juga menerima ketukan
+                onTap: _isEditing
+                    ? () => _focusUntuk(field.controller).requestFocus()
+                    : null,
+              child: Padding( // Jarak di sekeliling isi satu baris field
                 padding: const EdgeInsets.symmetric(
                     horizontal: 16, vertical: 12),
                 child: Row( // Ikon di kiri, label+nilai di kanan
@@ -301,7 +326,7 @@ class _InformasiProfilPageState extends State<InformasiProfilPage> { // Kelas St
                           Text( // Label kecil di atas nilai field
                             field.label, // Nama field, misal "Nama Lengkap"
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 13,
                               color: context.warnaTeksMuted, // Warna redup untuk label
                               fontWeight: FontWeight.w500,
                             ),
@@ -310,6 +335,7 @@ class _InformasiProfilPageState extends State<InformasiProfilPage> { // Kelas St
                           _isEditing // Pilih tampilan berdasarkan mode saat ini
                               ? TextField( // Mode edit: tampilkan kotak input yang bisa diketik
                                   controller: field.controller, // Controller pengelola teks field ini
+                                  focusNode: _focusUntuk(field.controller), // Fokus bisa dipicu dari seluruh baris
                                   maxLines: field.maxLines, // Jumlah baris maksimum (1 untuk kebanyakan, 3 untuk alamat)
                                   keyboardType: field.keyboardType, // Jenis keyboard sesuai tipe data field
                                   style: TextStyle(
@@ -331,7 +357,7 @@ class _InformasiProfilPageState extends State<InformasiProfilPage> { // Kelas St
                                     ),
                                     enabledBorder: UnderlineInputBorder( // Garis bawah saat field aktif tapi tidak difokus
                                       borderSide: BorderSide(
-                                          color: context.warnaGaris),
+                                          color: context.warnaGarisInput),
                                     ),
                                   ),
                                 )
@@ -348,6 +374,8 @@ class _InformasiProfilPageState extends State<InformasiProfilPage> { // Kelas St
                     ),
                   ],
                 ),
+              ),
+              ),
               ),
               if (!isLast) // Hanya tampilkan garis pemisah jika bukan field terakhir
                 Divider( // Garis pemisah horizontal antar field

@@ -66,6 +66,20 @@ class TransactionTile extends StatelessWidget { // Widget baris satu transaksi, 
     final TextStyle gayaJudul =
         AppTypography.titleSmall.copyWith(color: context.warnaTeksUtama); // Gaya teks untuk judul transaksi
 
+    // Saat ukuran font sistem diperbesar (≥ 150%), judul dan nominal
+    // tidak muat berdampingan di layar HP — nominal yang tidak boleh
+    // menyusut membuat baris meluber ke kanan (WCAG 1.4.4). Pada kondisi
+    // itu nominal turun ke baris sendiri dan judul boleh dua baris.
+    final bool teksBesar = MediaQuery.textScalerOf(context).scale(10) >= 15;
+    final Widget nominal = Text( // Nominal transaksi dengan tanda +/- opsional
+      '${tampilkanTanda ? (isMasuk ? '+' : '-') : ''}'
+      '${CurrencyFormatter.format(item.nominal)}',
+      maxLines: 1, // Batasi satu baris
+      softWrap: false, // Jangan pernah membungkus ke baris baru
+      overflow: TextOverflow.ellipsis, // Potong dengan "..." jika kepanjangan
+      style: gayaNominal.copyWith(color: warna),
+    );
+
     return Semantics( // Bungkus dengan info aksesibilitas untuk screen reader
       button: onTap != null, // Tandai sebagai tombol jika bisa ditekan
       // Seluruh transaksi dibacakan sebagai satu kalimat, termasuk
@@ -109,26 +123,26 @@ class TransactionTile extends StatelessWidget { // Widget baris satu transaksi, 
                   Expanded( // Judul memenuhi sisa ruang yang tersedia
                     child: Text(
                       item.title,
-                      maxLines: 1, // Batasi satu baris
+                      maxLines: teksBesar ? 2 : 1, // Satu baris, dua baris saat teks diperbesar
                       overflow: TextOverflow.ellipsis, // Potong dengan "..." jika kepanjangan
                       style: gayaJudul,
                     ),
                   ),
-                  const SizedBox(width: 8), // Jarak horizontal judul ke nominal
                   // Tanpa Flexible/Expanded — nominal tidak pernah
                   // menyusut atau melipat baris (setara flexShrink: 0).
                   // Judul di atas yang Expanded, jadi tekanan ruang
                   // diserap oleh judul (lewat ellipsis), bukan nominal.
-                  Text( // Nominal transaksi dengan tanda +/- opsional
-                    '${tampilkanTanda ? (isMasuk ? '+' : '-') : ''}'
-                    '${CurrencyFormatter.format(item.nominal)}',
-                    maxLines: 1, // Batasi satu baris
-                    softWrap: false, // Jangan pernah membungkus ke baris baru
-                    overflow: TextOverflow.ellipsis, // Potong dengan "..." jika kepanjangan
-                    style: gayaNominal.copyWith(color: warna),
-                  ),
+                  if (!teksBesar) ...[
+                    const SizedBox(width: 8), // Jarak horizontal judul ke nominal
+                    nominal,
+                  ],
                 ],
               ),
+              if (teksBesar) // Teks diperbesar: nominal di baris sendiri, sejajar judul
+                Padding(
+                  padding: const EdgeInsets.only(left: 42, top: 4),
+                  child: nominal,
+                ),
               const SizedBox(height: 4), // Jarak vertikal antara baris 1 dan baris 2
 
               // ── Baris 2: label arah + waktu (+ catatan/metode) ───

@@ -39,6 +39,13 @@ extension AppThemeContext on BuildContext { // Tambahan fungsi/getter pada Build
       ? warnaTeksUtama.withValues(alpha: 0.7)
       : (gelap ? AppColors.darkDivider : AppColors.divider);
 
+  // Garis tepi kolom input/kontrol. Berbeda dari warnaGaris yang murni
+  // dekoratif: batas kotak isian adalah informasi ("di sini bisa
+  // diketik"), jadi wajib ≥ 3:1 (WCAG 1.4.11).
+  Color get warnaGarisInput => kontrasTinggi // Warna garis tepi kolom input
+      ? warnaTeksUtama
+      : (gelap ? AppColors.darkInputBorder : AppColors.inputBorder);
+
   // Pemasukan/pengeluaran: tertiary700 dan primary700 dari palet
   // terang TIDAK dipakai ulang di mode gelap (kontras terhadap
   // #212121 jauh di bawah AA — lihat peringatan di app_colors.dart).
