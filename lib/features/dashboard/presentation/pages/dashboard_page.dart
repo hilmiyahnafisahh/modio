@@ -2,6 +2,7 @@ import 'package:flutter/material.dart'; // Import komponen UI utama Flutter (Wid
 import 'package:flutter/services.dart'; // Import untuk mengatur tampilan sistem, misalnya warna status bar
 
 import '../../../../core/navigation/app_route.dart'; // Fungsi bantu untuk membuat rute navigasi antar halaman
+import '../../../../core/widgets/akhir_halaman.dart'; // penanda & getaran saat halaman sampai dasar
 import '../../../../core/theme/app_typography.dart'; // Kumpulan gaya teks (font, ukuran) standar aplikasi
 import '../../../../core/theme/theme_extensions.dart'; // Ekstensi context untuk warna tema (mode gelap/terang)
 import '../../../../core/services/profile_update_service.dart'; // Service untuk memberi tahu jika profil pengguna berubah
@@ -131,6 +132,7 @@ class _DashboardPageState extends State<DashboardPage> { // Kelas State: tempat 
       body: SafeArea( // Memastikan konten tidak tertutup notch, status bar, atau area sistem lain
         child: RefreshIndicator( // Widget yang menambahkan gestur "tarik untuk menyegarkan"
           onRefresh: _segarkan, // Fungsi yang dipanggil saat pengguna menarik layar ke bawah
+          child: GetarAkhirGulir( // Getaran ringan sekali saat halaman sampai dasar
           child: SingleChildScrollView( // Membuat konten bisa digulir jika lebih panjang dari layar
             physics: const AlwaysScrollableScrollPhysics(), // Tetap bisa digulir/ditarik meski konten pendek (agar refresh selalu bisa dipicu)
             // Bottom 120: tinggi tombol mic (64) + jarak dari tepi —
@@ -217,9 +219,10 @@ class _DashboardPageState extends State<DashboardPage> { // Kelas State: tempat 
                   onChatTap: widget.onOpenAiChat ?? () {}, // Saat bagian "chat" ditekan, buka Asisten AI (atau tidak lakukan apa-apa jika callback kosong)
                 ),
 
-                const SizedBox(height: 24), // Jarak kosong 24 pixel di paling bawah konten
+                const PenandaAkhirHalaman(teks: 'Akhir beranda'), // Dibacakan TalkBack setelah elemen terakhir
               ],
             ),
+          ),
           ),
         ),
       ),
@@ -283,10 +286,13 @@ class _DashboardPageState extends State<DashboardPage> { // Kelas State: tempat 
     return Column( // Menyusun judul dan daftar secara vertikal
       crossAxisAlignment: CrossAxisAlignment.start, // Rata kiri
       children: [ // Isi kolom bagian transaksi
-        Text( // Judul bagian
-          'Transaksi Hari Ini', // Teks judul daftar transaksi
-          style: AppTypography.titleLarge.copyWith( // Gaya teks judul besar
-            color: context.warnaTeksUtama, // Warna teks utama sesuai tema
+        Semantics( // Tandai sebagai judul agar bisa dilompati lewat navigasi Judul TalkBack
+          header: true,
+          child: Text( // Judul bagian
+            'Transaksi Hari Ini', // Teks judul daftar transaksi
+            style: AppTypography.titleLarge.copyWith( // Gaya teks judul besar
+              color: context.warnaTeksUtama, // Warna teks utama sesuai tema
+            ),
           ),
         ),
         const SizedBox(height: 12), // Jarak 12 pixel antara judul dan daftar
@@ -315,7 +321,7 @@ class _DashboardPageState extends State<DashboardPage> { // Kelas State: tempat 
               return Semantics( // Bungkus kartu kosong dengan info aksesibilitas
                 // Dibacakan sebagai satu kalimat utuh. Tanpa ini
                 // TalkBack memecah kalimat pada tanda baris baru.
-                label: 'Transaksi Hari Ini. Belum ada catatan. ' // Bagian pertama label yang dibacakan pembaca layar
+                label: 'Belum ada catatan. ' // Bagian pertama label yang dibacakan pembaca layar
                     'Tekan tombol tambah di bawah untuk mencatat ' // Bagian kedua label
                     'transaksi pertama Anda.', // Bagian ketiga/penutup label
                 excludeSemantics: true, // Mencegah teks anak dibacakan dua kali

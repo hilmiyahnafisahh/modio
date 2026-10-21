@@ -4,6 +4,7 @@ import 'package:flutter/material.dart'; // Widget dan tema dasar Flutter
 import 'package:flutter/semantics.dart'; // Untuk mengirim pengumuman ke screen reader
 import 'package:speech_to_text/speech_to_text.dart' as  stt; // Plugin pengenalan suara jadi teks
 
+import '../../../../core/services/aksesibilitas_controller.dart'; // Pola getaran berhasil/gagal
 import '../../../../core/navigation/main_nav_controller.dart'; // Pengontrol navigasi tab & suara
 import '../../../../core/services/ai_parser_service.dart'; // Layanan AI untuk menguraikan teks jadi data transaksi
 import '../../../../core/services/keamanan_controller.dart'; // Sakelar Mode Suara: mengatur boleh/tidaknya fitur suara dipakai
@@ -57,6 +58,17 @@ Future<String?> dengarkanUcapan(BuildContext context) { // Fungsi untuk membuka 
 /// catatan saja, supaya pengguna tetap bisa lanjut mengisi form secara
 /// manual alih-alih ucapannya terbuang sia-sia. Menampilkan snackbar
 /// supaya pengguna tahu penguraian otomatis gagal.
+///
+/// Dua hal lain juga ditangani di sini, sekali untuk semua pemanggil
+/// (tombol mic global maupun mic di dalam form yang sedang terbuka):
+///   1. Kategori yang ditebak AI tapi belum ada di daftar kategori milik
+///      jenis itu langsung ditambahkan ke basis data (lihat
+///      [TransaksiRepository.tambahKategori]) — "masukkan ke kategori
+///      yang ada, atau tambah baru" bukan cuma teks bebas yang nanti
+///      ditolak halaman pemilih kategori.
+///   2. Bila jenis/nominal/kategori masih belum jelas dari ucapan,
+///      pengguna ditanya balik lewat pengumuman suara (dan snackbar),
+///      supaya ia tahu persis apa yang masih perlu dilengkapi di form.
 Future<ParsedTransaction?> uraikanUcapanTransaksi(
   BuildContext context,
   String teks, // Teks hasil ucapan yang akan diuraikan
@@ -70,13 +82,15 @@ Future<ParsedTransaction?> uraikanUcapanTransaksi(
 
   if (!context.mounted) return null; // Batalkan jika context sudah tidak valid setelah await
 
+  ParsedTransaction hasil; // Hasil penguraian AI, diisi lewat try/catch di bawah
   try {
-    return await AiParserService().uraikanTransaksi( // Panggil AI untuk menguraikan teks jadi data transaksi
+    hasil = await AiParserService().uraikanTransaksi( // Panggil AI untuk menguraikan teks jadi data transaksi
       teks: teks,
       kategoriMasuk: kategoriMasuk, // Beri konteks kategori yang tersedia agar tebakan lebih akurat
       kategoriKeluar: kategoriKeluar,
     );
   } catch (_) { // Jika terjadi error apa pun (mis. tidak ada koneksi)
+    AksesibilitasController.instance.getarGagal(); // Pola gagal: 2 getaran pendek
     messenger.showSnackBar( // Tampilkan pesan error ke pengguna
       const SnackBar(
         content: Text(
@@ -90,6 +104,63 @@ Future<ParsedTransaction?> uraikanUcapanTransaksi(
     // form yang sudah terisi sebagian alih-alih berhenti total.
     return ParsedTransaction(catatan: teks);
   }
+
+  // Jenis harus jelas dulu sebelum kategori baru bisa ditambahkan —
+  // tabel kategori disekat per jenis (masuk/keluar).
+  if (hasil.kategori != null && hasil.kategori!.trim().isNotEmpty &&
+      (hasil.jenis == 'masuk' || hasil.jenis == 'keluar')) {
+    final TransactionType type =
+        hasil.jenis == 'masuk' ? TransactionType.masuk : TransactionType.keluar;
+    final List<String> daftar =
+        type == TransactionType.masuk ? kategoriMasuk : kategoriKeluar;
+    if (!daftar.contains(hasil.kategori)) {
+      await repo.tambahKategori(hasil.kategori!, type); // Simpan kategori baru agar langsung sah dipakai
+    }
+  }
+
+  if (context.mounted) {
+    final String? pesanKurang = _pesanIsianKurang(hasil); // Tanyakan balik isian yang masih kosong, bila ada
+    if (pesanKurang != null) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(pesanKurang, style: const TextStyle(fontSize: 16)),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+      // Diumumkan juga lewat sistem aksesibilitas — snackbar hilang
+      // dalam beberapa detik dan sering terlewat TalkBack, sedangkan
+      // ini konsisten dengan pola "dibacakan" yang sudah dipakai di
+      // seluruh alur suara aplikasi ini.
+      SemanticsService.sendAnnouncement(
+        View.of(context),
+        pesanKurang,
+        Directionality.of(context),
+      );
+    }
+  }
+
+  return hasil;
+}
+
+/// Menyusun pertanyaan balik untuk isian penting yang belum kesebut di
+/// ucapan pengguna — jenis (masuk/keluar), nominal, dan kategori.
+/// Metode bayar sengaja tidak ditanyakan: form punya nilai bawaan
+/// ("tunai") yang selalu valid, jadi tidak pernah benar-benar "kosong".
+/// Mengembalikan null bila ketiganya sudah lengkap.
+String? _pesanIsianKurang(ParsedTransaction hasil) {
+  final List<String> tanya = [];
+  if (hasil.jenis != 'masuk' && hasil.jenis != 'keluar') {
+    tanya.add('uang masuk atau keluar');
+  }
+  if (hasil.nominal == null || hasil.nominal! <= 0) {
+    tanya.add('jumlahnya berapa');
+  }
+  if (hasil.kategori == null || hasil.kategori!.trim().isEmpty) {
+    tanya.add('kategori apa');
+  }
+  if (tanya.isEmpty) return null;
+  return 'Masih ada yang belum jelas dari ucapan: ${tanya.join(', ')}? '
+      'Lengkapi di form sebelum menyimpan.';
 }
 
 /// Dipanggil dari tombol mic di halaman mana pun (di luar form yang

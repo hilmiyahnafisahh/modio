@@ -62,9 +62,20 @@ class VoiceInputBar extends StatelessWidget { // Widget bar input, tanpa state i
                   horizontal: 16,
                   vertical: 10,
                 ),
+                // Di mode terang latar kolom dan latar bar sama-sama putih,
+                // jadi tanpa garis tepi kolom ketik tidak terlihat sama sekali.
                 border: OutlineInputBorder( // Bentuk garis tepi kolom
                   borderRadius: BorderRadius.circular(24), // Sudut sangat membulat
-                  borderSide: BorderSide.none, // Tanpa garis tepi terlihat
+                  borderSide: BorderSide(color: context.warnaGarisInput), // Garis tepi ≥ 3:1
+                ),
+                enabledBorder: OutlineInputBorder( // Garis tepi saat tidak difokus
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide(color: context.warnaGarisInput),
+                ),
+                focusedBorder: OutlineInputBorder( // Garis tepi saat sedang mengetik
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide(
+                      color: Theme.of(context).colorScheme.primary, width: 2),
                 ),
               ),
               onSubmitted: onSend, // Kirim pesan saat menekan enter/submit
@@ -73,11 +84,16 @@ class VoiceInputBar extends StatelessWidget { // Widget bar input, tanpa state i
           const SizedBox(width: 8), // Jarak horizontal kolom teks ke tombol mic
 
           // ── Tombol Suara ─────────────────────────────────────
-          GestureDetector( // Deteksi ketukan pada tombol mic
+          Semantics( // Tombol ikon tanpa teks wajib punya label untuk pembaca layar
+            label: 'Tanya dengan suara', // Teks yang dibacakan screen reader
+            button: true, // Tandai sebagai tombol
+            excludeSemantics: true, // Ikon di dalamnya tidak dibaca terpisah
+            onTap: onVoice, // Aksi saat diaktifkan lewat screen reader
+            child: GestureDetector( // Deteksi ketukan pada tombol mic
             onTap: onVoice, // Panggil callback suara saat ditekan
             child: Container( // Lingkaran tombol mic
-              width: 44,
-              height: 44,
+              width: 48, // Target sentuh minimum 48 dp
+              height: 48,
               decoration: BoxDecoration(
                 color: context.latarMasuk, // Warna latar tombol
                 shape: BoxShape.circle, // Bentuk lingkaran
@@ -89,14 +105,20 @@ class VoiceInputBar extends StatelessWidget { // Widget bar input, tanpa state i
               ),
             ),
           ),
+          ),
           const SizedBox(width: 8), // Jarak horizontal tombol mic ke tombol kirim
 
           // ── Tombol Kirim ─────────────────────────────────────
-          GestureDetector( // Deteksi ketukan pada tombol kirim
+          Semantics( // Tombol ikon tanpa teks wajib punya label untuk pembaca layar
+            label: 'Kirim pertanyaan', // Teks yang dibacakan screen reader
+            button: true, // Tandai sebagai tombol
+            excludeSemantics: true, // Ikon di dalamnya tidak dibaca terpisah
+            onTap: () => onSend(controller.text), // Aksi saat diaktifkan lewat screen reader
+            child: GestureDetector( // Deteksi ketukan pada tombol kirim
             onTap: () => onSend(controller.text), // Kirim isi kolom teks saat ditekan
             child: Container( // Lingkaran tombol kirim
-              width: 44,
-              height: 44,
+              width: 48, // Target sentuh minimum 48 dp
+              height: 48,
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.primary, // Warna latar tombol dari tema
                 shape: BoxShape.circle, // Bentuk lingkaran
@@ -107,6 +129,7 @@ class VoiceInputBar extends StatelessWidget { // Widget bar input, tanpa state i
                 color: Theme.of(context).colorScheme.onPrimary, // Warna ikon kontras dengan latar
               ),
             ),
+          ),
           ),
         ],
       ),

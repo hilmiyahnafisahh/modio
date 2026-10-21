@@ -5,11 +5,13 @@ import 'package:flutter/semantics.dart'; // Untuk mengirim pengumuman ke screen 
 import 'package:flutter/services.dart'; // Untuk HapticFeedback (getaran) dan SystemUiOverlayStyle
 import 'package:local_auth/local_auth.dart'; // Autentikasi biometrik (sidik jari/wajah) bawaan perangkat
 
+import '../../../../core/services/aksesibilitas_controller.dart'; // Pola getaran berhasil/gagal
 import '../../../../core/services/keamanan_controller.dart'; // Pengaturan metode masuk tambahan (suara/biometrik)
 import '../../../../core/theme/theme_extensions.dart'; // Extension context.warnaXxx untuk warna sesuai tema
 import '../../../../core/utils/spoken_digits.dart'; // Pengurai ucapan angka jadi deretan digit PIN
 import '../../../transactions/presentation/widgets/voice_transaction_flow.dart'; // dengarkanUcapan(): lembar dengar suara generik
 import '../../data/auth_repository.dart'; // Sumber data & logika autentikasi PIN
+import '../../../onboarding/presentation/widgets/penanda_langkah.dart'; // Penanda "Langkah 2 dari 3" saat registrasi
 import '../widgets/pin_keypad.dart'; // Widget keypad angka dan indikator titik PIN
 
 /// ─────────────────────────────────────────────────────────────────
@@ -24,16 +26,21 @@ import '../widgets/pin_keypad.dart'; // Widget keypad angka dan indikator titik 
 /// ─────────────────────────────────────────────────────────────────
 
 class PinLockPage extends StatefulWidget { // Halaman kunci PIN, punya state karena input berubah-ubah
-  const PinLockPage({super.key, required this.onBerhasil});
+  const PinLockPage({super.key, required this.onBerhasil, this.pendaftaran = false});
 
   /// Dipanggil setelah PIN diterima
   final VoidCallback onBerhasil; // Callback saat PIN sukses dibuat/diverifikasi
+
+  /// true saat dipakai sebagai langkah 2 registrasi: menampilkan penanda
+  /// langkah dan tidak mengumumkan "Membuka aplikasi" karena masih ada
+  /// langkah pilih tema sesudahnya.
+  final bool pendaftaran;
 
   @override
   State<PinLockPage> createState() => _PinLockPageState(); // Buat objek state terkait
 }
 
-enum _Tahap { memuat, buatBaru, konfirmasiBaru, masuk } // Tahap alur: memuat data, buat PIN, konfirmasi, atau login
+enum _Tahap { memuat, pilihCara, buatBaru, konfirmasiBaru, masuk } // Tahap alur: memuat, pilih cara masuk, buat PIN, konfirmasi, atau login
 
 class _PinLockPageState extends State<PinLockPage> {
   final AuthRepository _repo = AuthRepository.instance; // Ambil instance singleton repository auth
@@ -42,6 +49,12 @@ class _PinLockPageState extends State<PinLockPage> {
   _Tahap _tahap = _Tahap.memuat; // Tahap alur saat ini, mulai dari memuat
   String _pin = ''; // Digit PIN yang sedang diketik pengguna
   String _pinPertama = ''; // Simpan PIN pertama saat proses buat PIN (untuk dicocokkan)
+
+  /// true bila di halaman pilihan awal pengguna memilih sidik jari dan
+  /// jarinya sudah terverifikasi. Biometrik baru diaktifkan sesudah PIN
+  /// cadangan tersimpan, supaya tidak ada keadaan "sidik jari aktif
+  /// tanpa PIN".
+  bool _pakaiSidikJari = false;
   String? _galat; // Pesan galat yang sedang ditampilkan, jika ada
   bool _sibuk = false; // Menandai sedang memproses (mencegah input ganda)
 
@@ -54,6 +67,7 @@ class _PinLockPageState extends State<PinLockPage> {
   bool get _bisaSuara =>
       _tahap == _Tahap.masuk && KeamananController.instance.suaraAktif.value; // Opsi suara hanya relevan saat login, bukan saat membuat PIN baru
   bool get _bisaBiometrik =>
+      KeamananController.biometrikTersedia && // Dimatikan sementara selama masih pengembangan
       _tahap == _Tahap.masuk && KeamananController.instance.biometrikAktif.value; // Sama halnya untuk biometrik
 
   @override
@@ -71,10 +85,15 @@ class _PinLockPageState extends State<PinLockPage> {
   Future<void> _mulai() async { // Cek apakah PIN sudah pernah dibuat dan status penguncian
     final bool ada = await _repo.sudahAdaPin(); // Cek apakah PIN sudah tersimpan
     final int kunci = await _repo.sisaPenguncian(); // Ambil sisa detik penguncian saat ini
+    // Halaman pilihan cara masuk hanya berguna bila HP punya sidik jari
+    // terdaftar; tanpa itu pilihannya cuma PIN, jadi langsung buat PIN.
+    final bool adaSidikJari = !ada && await _sidikJariTersedia();
     if (!mounted) return; // Batalkan jika widget sudah dilepas sebelum data siap
 
     setState(() {
-      _tahap = ada ? _Tahap.masuk : _Tahap.buatBaru; // Tentukan tahap awal sesuai ada/tidaknya PIN
+      _tahap = ada // Tentukan tahap awal sesuai ada/tidaknya PIN
+          ? _Tahap.masuk
+          : (adaSidikJari ? _Tahap.pilihCara : _Tahap.buatBaru);
       _sisaKunci = kunci; // Simpan sisa kunci ke state
     });
 
@@ -119,15 +138,18 @@ class _PinLockPageState extends State<PinLockPage> {
 
   String get _judul => switch (_tahap) { // Judul halaman berbeda tergantung tahap
         _Tahap.memuat => 'Memuat',
-        _Tahap.buatBaru => 'Buat PIN baru',
+        _Tahap.pilihCara => 'Pilih cara masuk',
+        _Tahap.buatBaru => _pakaiSidikJari ? 'Buat PIN cadangan' : 'Buat PIN baru',
         _Tahap.konfirmasiBaru => 'Ulangi PIN baru',
         _Tahap.masuk => 'Masukkan PIN Anda',
       };
 
   String get _keterangan => switch (_tahap) { // Teks keterangan tambahan sesuai tahap
         _Tahap.memuat => '',
-        _Tahap.buatBaru =>
-          'PIN enam angka untuk mengunci catatan keuangan Anda',
+        _Tahap.pilihCara => 'Bagaimana Anda ingin membuka Modio?',
+        _Tahap.buatBaru => _pakaiSidikJari
+            ? 'Dipakai bila sidik jari gagal dikenali'
+            : 'PIN enam angka untuk mengunci catatan keuangan Anda',
         _Tahap.konfirmasiBaru => 'Masukkan sekali lagi untuk memastikan',
         _Tahap.masuk => 'Enam angka',
       };
@@ -177,14 +199,21 @@ class _PinLockPageState extends State<PinLockPage> {
         }
         await _repo.simpanPin(_pin); // Simpan PIN yang sudah dikonfirmasi ke penyimpanan
         if (!mounted) return; // Batalkan jika widget sudah dilepas selama await
-        _umumkan('PIN berhasil dibuat. Membuka aplikasi.'); // Umumkan keberhasilan
-        HapticFeedback.mediumImpact(); // Getaran sedang sebagai konfirmasi sukses
+        if (_pakaiSidikJari) { // Pilihan di halaman awal: aktifkan sesudah PIN cadangan tersimpan
+          await KeamananController.instance.ubahBiometrik(true);
+          if (!mounted) return;
+        }
+        final String lanjut = widget.pendaftaran ? 'Lanjut ke pilihan tema.' : 'Membuka aplikasi.';
+        _umumkan(_pakaiSidikJari
+            ? 'PIN cadangan dibuat. Sidik jari aktif. $lanjut'
+            : 'PIN berhasil dibuat. $lanjut'); // Umumkan keberhasilan
+        AksesibilitasController.instance.getarBerhasil(); // Pola berhasil: 1 getaran pendek
         widget.onBerhasil(); // Panggil callback bahwa PIN berhasil diproses
 
       case _Tahap.masuk: // Tahap login dengan PIN yang sudah ada
         await _verifikasiPinString(_pin); // Cocokkan PIN yang diketik lewat keypad
 
-      case _Tahap.memuat: // Kasus tahap masih memuat (seharusnya tidak terjadi saat proses dipanggil)
+      case _Tahap.memuat || _Tahap.pilihCara: // Keypad tidak tampil di kedua tahap ini
         setState(() => _sibuk = false); // Reset status sibuk saja
     }
   }
@@ -201,7 +230,7 @@ class _PinLockPageState extends State<PinLockPage> {
 
     if (cocok) { // Jika PIN benar
       _umumkan('PIN benar. Membuka aplikasi.'); // Umumkan keberhasilan
-      HapticFeedback.mediumImpact(); // Getaran sedang sebagai konfirmasi
+      AksesibilitasController.instance.getarBerhasil(); // Pola berhasil: 1 getaran pendek
       widget.onBerhasil(); // Panggil callback sukses
       return;
     }
@@ -277,7 +306,7 @@ class _PinLockPageState extends State<PinLockPage> {
 
       if (berhasil) { // Biometrik cocok
         _umumkan('Biometrik berhasil. Membuka aplikasi.'); // Umumkan keberhasilan
-        HapticFeedback.mediumImpact(); // Pola getaran sukses, sama seperti PIN benar
+        AksesibilitasController.instance.getarBerhasil(); // Pola berhasil, sama seperti PIN benar
         widget.onBerhasil(); // Panggil callback sukses
       } else if (!otomatis) { // Dibatalkan/gagal cocok, dan pengguna sendiri yang meminta
         _umumkan('Biometrik dibatalkan. Silakan masukkan PIN.');
@@ -291,10 +320,105 @@ class _PinLockPageState extends State<PinLockPage> {
     }
   }
 
+  Future<bool> _sidikJariTersedia() async { // HP punya sensor DAN sidik jari terdaftar?
+    try {
+      return await _localAuth.isDeviceSupported() && await _localAuth.canCheckBiometrics;
+    } catch (_) {
+      return false; // Sensor bermasalah: anggap tidak tersedia, PIN tetap bisa dipakai
+    }
+  }
+
+  /// Pilihan di halaman "Pilih cara masuk". Sidik jari diverifikasi
+  /// dulu supaya pengguna yakin jarinya dikenali sebelum
+  /// mengandalkannya, lalu tetap diminta membuat PIN cadangan.
+  Future<void> _pilihCaraMasuk({required bool sidikJari}) async {
+    if (_sibuk) return;
+    if (sidikJari) {
+      setState(() => _sibuk = true);
+      bool berhasil = false;
+      try {
+        berhasil = await _localAuth.authenticate(
+          localizedReason: 'Tempelkan jari untuk memakai sidik jari saat membuka Modio',
+          options: const AuthenticationOptions(biometricOnly: true, stickyAuth: true),
+        );
+      } catch (_) {
+        berhasil = false;
+      }
+      if (!mounted) return;
+      setState(() => _sibuk = false);
+      if (!berhasil) {
+        AksesibilitasController.instance.getarGagal(); // Pola gagal: 2 getaran pendek
+        _umumkan('Sidik jari belum dikenali. Coba lagi, atau pilih PIN saja.');
+        return; // Tetap di halaman pilihan
+      }
+      AksesibilitasController.instance.getarBerhasil(); // Pola berhasil: 1 getaran pendek
+    }
+    setState(() {
+      _pakaiSidikJari = sidikJari;
+      _tahap = _Tahap.buatBaru;
+    });
+    _umumkan(sidikJari
+        ? 'Sidik jari dikenali. Sekarang buat PIN cadangan enam angka.'
+        : 'Buat PIN baru enam angka.');
+  }
+
+  /// Halaman pertama sekali sebelum PIN dibuat: pilih PIN saja atau
+  /// sidik jari (dengan PIN cadangan).
+  Widget _buildPilihCara(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (widget.pendaftaran) ...[
+                const PenandaLangkah(langkah: 2),
+                const SizedBox(height: 28),
+              ],
+              Icon(Icons.lock_outline, size: 52, color: scheme.primary),
+              const SizedBox(height: 20),
+              Semantics(
+                header: true,
+                child: Text(
+                  _judul,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: context.warnaTeksUtama),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _keterangan,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, color: context.warnaTeksMuted),
+              ),
+              const SizedBox(height: 32),
+              _KartuCaraMasuk(
+                icon: Icons.fingerprint_rounded,
+                judul: 'Sidik jari',
+                keterangan: 'Tempelkan jari untuk masuk. Anda tetap membuat PIN sebagai cadangan.',
+                onTap: _sibuk ? null : () => _pilihCaraMasuk(sidikJari: true),
+              ),
+              const SizedBox(height: 12),
+              _KartuCaraMasuk(
+                icon: Icons.dialpad_rounded,
+                judul: 'PIN saja',
+                keterangan: 'Masuk dengan enam angka. Sidik jari bisa diaktifkan nanti di Profil.',
+                onTap: _sibuk ? null : () => _pilihCaraMasuk(sidikJari: false),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _tampilkanGalat(String pesan) { // Menampilkan pesan galat dan mereset input
-    // Getaran kuat sebagai penanda kegagalan. Berbeda dari getaran
-    // ringan saat menekan tombol, sehingga terbedakan tanpa melihat.
-    HapticFeedback.heavyImpact(); // Getaran kuat menandakan kegagalan
+    // Pola gagal (2 getaran pendek), berbeda dari 1 getaran saat
+    // berhasil dan getaran ringan saat menekan tombol angka.
+    AksesibilitasController.instance.getarGagal(); // Pola gagal: 2 getaran pendek
     setState(() {
       _galat = pesan; // Simpan pesan galat untuk ditampilkan
       _pin = ''; // Kosongkan input PIN
@@ -314,6 +438,8 @@ class _PinLockPageState extends State<PinLockPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_tahap == _Tahap.pilihCara) return _buildPilihCara(context); // Halaman pilihan cara masuk
+
     if (_tahap == _Tahap.memuat) { // Selagi masih memuat status PIN
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -336,6 +462,11 @@ class _PinLockPageState extends State<PinLockPage> {
       body: SafeArea( // Hindari area sistem seperti notch/status bar
         child: Column(
           children: [
+            if (widget.pendaftaran && _tahap != _Tahap.masuk)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(24, 24, 24, 0),
+                child: PenandaLangkah(langkah: 2),
+              ),
             const Spacer(flex: 2), // Ruang kosong fleksibel di atas
 
             Icon(
@@ -500,6 +631,67 @@ class _TombolMasukAlternatif extends StatelessWidget { // Tombol bulat + label u
                     color: warna,
                   ),
                 ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Satu pilihan di halaman "Pilih cara masuk": kartu besar yang seluruh
+/// permukaannya bisa diketuk, dibacakan sebagai satu tombol utuh.
+class _KartuCaraMasuk extends StatelessWidget {
+  const _KartuCaraMasuk({
+    required this.icon,
+    required this.judul,
+    required this.keterangan,
+    required this.onTap,
+  });
+
+  final IconData icon; // Ikon cara masuk
+  final String judul; // Nama pilihan
+  final String keterangan; // Penjelasan singkat
+  final VoidCallback? onTap; // null saat sedang memproses
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Semantics(
+      button: true,
+      enabled: onTap != null,
+      label: '$judul. $keterangan',
+      hint: 'Ketuk dua kali untuk memilih',
+      onTap: onTap,
+      excludeSemantics: true,
+      child: Material(
+        color: context.warnaKartu,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: context.warnaGarisInput, width: 1.5), // batas kontrol >= 3:1
+        ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Row(
+              children: [
+                Icon(icon, size: 36, color: scheme.primary),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(judul,
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: context.warnaTeksUtama)),
+                      const SizedBox(height: 4),
+                      Text(keterangan, style: TextStyle(fontSize: 14, color: context.warnaTeksMuted)),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: context.warnaTeksMuted),
               ],
             ),
           ),

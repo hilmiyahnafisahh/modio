@@ -40,10 +40,13 @@ class SummaryGrid extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Ringkasan Hari Ini',
-          style: AppTypography.titleMedium.copyWith(
-            color: context.warnaTeksUtama,
+        Semantics( // Tandai sebagai judul agar bisa dilompati lewat navigasi Judul TalkBack
+          header: true,
+          child: Text(
+            'Ringkasan Hari Ini',
+            style: AppTypography.titleMedium.copyWith(
+              color: context.warnaTeksUtama,
+            ),
           ),
         ),
         const SizedBox(height: 12),

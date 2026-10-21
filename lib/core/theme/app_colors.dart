@@ -54,7 +54,11 @@ class AppColors { // Kumpulan konstanta warna aplikasi
   static const Color tertiary50  = Color(0xFFFEF2F2); // latar saja
 
   // ── Amber (kartu jumlah transaksi) ───────────────────────────────
-  static const Color amber700 = Color(0xFF92400E); // teks 7,4:1 ✓ AAA
+  /// Teks 7,7:1 terhadap putih, 7,4:1 terhadap amber50 ✓ AAA
+  ///
+  /// Digelapkan dari #92400E yang hanya 6,8:1 di atas amber50,
+  /// yaitu latar kartu "Transaksi" tempat warna ini dipakai.
+  static const Color amber700 = Color(0xFF8A3C0D);
   static const Color amber50  = Color(0xFFFFFBEB); // latar saja
 
   // ── Warna Netral ────────────────────────────────────────────────
@@ -62,15 +66,25 @@ class AppColors { // Kumpulan konstanta warna aplikasi
   static const Color white     = Color(0xFFFFFFFF); // warna putih murni
   static const Color bgPage    = Color(0xFFFFFFFF);  // putih bersih
   static const Color inputFill = Color(0xFFF5F5F5);  // latar input field di atas putih
-  static const Color divider   = Color(0xFFE2E4E9);  // garis & border kartu
+  static const Color divider   = Color(0xFFE2E4E9);  // garis & border kartu (dekoratif saja, 1,3:1)
 
-  /// Teks sekunder, 7,6:1 ✓ AAA
+  /// Garis tepi kolom input dan kontrol lain yang harus bisa dikenali
+  /// bentuknya. WCAG 1.4.11 (Non-text Contrast) mensyaratkan ≥ 3:1;
+  /// `divider` hanya 1,3:1 sehingga kotak isian nyaris tak terlihat
+  /// bagi pengguna low vision. 3,9:1 terhadap putih, 3,6:1 terhadap
+  /// inputFill.
+  static const Color inputBorder = Color(0xFF7C828C);
+
+  /// Teks sekunder, 8,2:1 terhadap putih ✓ AAA, dan tetap ≥ 7,4:1 di
+  /// atas semua latar berakhiran 50 serta inputFill.
   ///
+  /// Sebelumnya #4B5563: 7,6:1 terhadap putih, tetapi turun ke 6,9:1
+  /// di atas inputFill/tertiary50 — hanya lolos AA.
   /// Digelapkan dari #6B7280 yang hanya mencapai 4,8:1. Warna ini
   /// dipakai untuk waktu, metode bayar, dan keterangan — informasi
   /// yang tetap harus terbaca pengguna low vision, bukan sekadar
   /// pelengkap visual.
-  static const Color textMuted = Color(0xFF4B5563); // warna teks sekunder/keterangan
+  static const Color textMuted = Color(0xFF46505E); // warna teks sekunder/keterangan
 
   // ── Mode Gelap ───────────────────────────────────────────────────
   // Latar memakai hitam netral standar Material Design, tanpa
@@ -87,6 +101,7 @@ class AppColors { // Kumpulan konstanta warna aplikasi
   static const Color darkSurface   = Color(0xFF1E1E1E); // kartu
   static const Color darkSurfaceHi = Color(0xFF2A2A2A); // kartu menonjol
   static const Color darkDivider   = Color(0xFF3D3D3D); // garis pemisah
+  static const Color darkInputBorder = Color(0xFF808080); // garis tepi kolom input, ≥ 3,6:1 terhadap semua latar gelap (WCAG 1.4.11)
 
   static const Color darkText      = Color(0xFFF8FAFC); // 17,9:1 ✓ AAA
   static const Color darkTextMuted = Color(0xFFCBD5E1); // 12,6:1 ✓ AAA

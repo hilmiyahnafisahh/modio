@@ -10,11 +10,10 @@ class ApiConstants { // Kumpulan konstanta terkait komunikasi API
   ApiConstants._(); // Konstruktor privat, kelas ini hanya wadah statis
 
   // ── Base URL ─────────────────────────────────────────────────────
-  // Sementara menunjuk ke proxy AI lokal (backend/main.py) yang jalan
-  // di IP LAN laptop pengembang — HP harus satu jaringan WiFi dengan
-  // laptop supaya bisa mengaksesnya. Ganti dengan URL server produksi
-  // yang sebenarnya begitu proxy ini di-deploy ke tempat permanen.
-  static const String baseUrl = 'http://10.66.180.254:8000'; // Alamat dasar server backend
+  // Proxy AI (backend/main.py) yang sudah di-hosting permanen. Tanpa
+  // trailing slash — tiap endpoint di bawah sudah diawali '/', jadi
+  // trailing slash di sini akan membuat URL gabungan jadi dobel-slash.
+  static const String baseUrl = 'https://modio-api.stas-rg.com'; // Alamat dasar server backend
 
   // ── Timeout ──────────────────────────────────────────────────────
   // Batas waktu tunggu koneksi (dalam detik)
@@ -31,7 +30,7 @@ class ApiConstants { // Kumpulan konstanta terkait komunikasi API
 
   // ── Endpoint AI ──────────────────────────────────────────────────
   static const String aiChat         = '/ai/chat'; // Endpoint obrolan dengan AI
-  static const String aiAnalysis     = '/ai/analysis'; // Endpoint analisis AI
+  static const String aiAnalysis     = '/v1/ai/analysis'; // Endpoint saran AI untuk laporan bulanan
   static const String aiParseTransaction = '/v1/ai/parse-transaction'; // Endpoint penguraian ucapan menjadi transaksi
 
   // ── Endpoint Auth ────────────────────────────────────────────────

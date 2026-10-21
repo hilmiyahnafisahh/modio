@@ -3,6 +3,8 @@ import 'package:flutter/semantics.dart'; // untuk mengumumkan info ke pembaca la
 import 'package:flutter/services.dart'; // untuk SystemUiOverlayStyle (warna status bar)
 
 import '../../../../core/navigation/app_route.dart'; // helper buatRute() untuk navigasi antar halaman
+import '../../../../core/widgets/month_picker_dialog.dart'; // dialog pemilih bulan & tahun untuk menu Riwayat
+import '../../../../core/widgets/akhir_halaman.dart'; // penanda & getaran saat halaman sampai dasar
 import '../../../../core/theme/app_typography.dart'; // kumpulan gaya teks (font, ukuran) aplikasi
 import '../../../../core/theme/theme_extensions.dart'; // ekstensi warna tema (context.warnaX, context.gelap)
 import '../../../../core/utils/currency_formatter.dart'; // format angka menjadi teks Rupiah
@@ -13,10 +15,10 @@ import '../widgets/voice_transaction_flow.dart'; // alur catat transaksi via sua
 import 'transaction_detail_page.dart'; // halaman detail satu transaksi
 
 /// ─────────────────────────────────────────────────────────────────
-/// HISTORY PAGE  –  Riwayat transaksi lengkap
+/// HISTORY PAGE  –  Halaman Transaksi
 ///
 /// Berbeda dari dashboard yang hanya menampilkan lima transaksi
-/// terbaru, halaman ini memuat seluruh riwayat dan menyediakan
+/// terbaru, halaman ini memuat transaksi per periode dan menyediakan
 /// penyaringan berdasarkan periode, jenis, dan kata kunci.
 /// ─────────────────────────────────────────────────────────────────
 
@@ -27,10 +29,15 @@ class HistoryPage extends StatefulWidget { // widget halaman Riwayat, punya stat
   State<HistoryPage> createState() => _HistoryPageState(); // buat objek state terkait halaman ini
 }
 
-/// Pilihan periode riwayat: cuma dua hari terakhir, tanpa kalender atau
-/// preset minggu/bulan/semua waktu — riwayat penuh tetap bisa dicari
-/// lewat kolom pencarian di atasnya kalau perlu tanggal yang lebih lama.
-enum _RiwayatPeriode { hariIni, kemarin }
+/// Pilihan periode, sengaja hanya tiga (feedback dosen: pilihan sedikit
+/// supaya navigasi pembaca layar tetap pendek):
+///   • Hari Ini  — kebutuhan harian, pilihan utama
+///   • Tahun Ini — rekap sejak 1 Januari
+///   • Riwayat   — transaksi lama per bulan, termasuk lebih dari satu
+///                 tahun lalu. Tidak menampilkan semua transaksi lama
+///                 sekaligus; pengguna memilih bulan & tahunnya.
+/// Semua transaksi tetap tersimpan; ketiganya hanya filter tampilan.
+enum _RiwayatPeriode { hariIni, tahunIni, riwayat }
 
 class _HistoryPageState extends State<HistoryPage> { // kelas state untuk HistoryPage
   final TransaksiRepository _repo = TransaksiRepository(); // sumber data transaksi, sekali dibuat
@@ -42,10 +49,23 @@ class _HistoryPageState extends State<HistoryPage> { // kelas state untuk Histor
 
   TransactionType? _jenis; // null berarti semua jenis
 
+  /// Bulan yang ditampilkan saat periode "Riwayat" aktif. Awalnya
+  /// bulan berjalan; diganti lewat tombol pilih bulan.
+  DateTime _bulanRiwayat = DateTime(DateTime.now().year, DateTime.now().month);
+
+  static const List<String> _namaBulan = [ // nama bulan untuk label, indeks 0 kosong
+    '', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+  ];
+
+  String get _labelBulanRiwayat => // mis. "Oktober 2026"
+      '${_namaBulan[_bulanRiwayat.month]} ${_bulanRiwayat.year}';
+
   /// Label periode yang sedang aktif, ditampilkan di tombol pemilih.
   String get _labelPeriode => switch (_periode) {
         _RiwayatPeriode.hariIni => 'Hari Ini',
-        _RiwayatPeriode.kemarin => 'Kemarin',
+        _RiwayatPeriode.tahunIni => 'Tahun Ini, ${DateTime.now().year}',
+        _RiwayatPeriode.riwayat => 'Riwayat $_labelBulanRiwayat',
       };
 
   /// Label jenis transaksi yang sedang aktif, ditampilkan di tombol
@@ -70,14 +90,15 @@ class _HistoryPageState extends State<HistoryPage> { // kelas state untuk Histor
 
   void _muat() { // fungsi untuk memuat/memuat ulang daftar transaksi
     setState(() { // beri tahu Flutter agar UI dibangun ulang
-      final bool kemarin = _periode == _RiwayatPeriode.kemarin; // true bila periode aktif adalah "Kemarin"
-      // batas null: seluruh riwayat hari itu, bukan hanya sebagian.
+      // batas null: seluruh transaksi periode itu, bukan hanya sebagian.
       _transaksi = _repo.riwayat( // ambil data sesuai filter aktif
         batas: null, // tanpa batas jumlah, ambil semua
-        periode: kemarin ? PeriodeFilter.semua : PeriodeFilter.hariIni, // diabaikan repo saat tanggalKhusus diisi
-        tanggalKhusus: kemarin // "Kemarin" selalu satu hari kalender spesifik: hari ini dikurangi satu
-            ? DateTime.now().subtract(const Duration(days: 1))
-            : null,
+        periode: switch (_periode) { // diabaikan repo saat bulanKhusus diisi
+          _RiwayatPeriode.hariIni => PeriodeFilter.hariIni,
+          _RiwayatPeriode.tahunIni => PeriodeFilter.tahunIni,
+          _RiwayatPeriode.riwayat => PeriodeFilter.semua,
+        },
+        bulanKhusus: _periode == _RiwayatPeriode.riwayat ? _bulanRiwayat : null, // Riwayat: satu bulan pilihan
         type: _jenis, // filter jenis transaksi
         cari: _cariCtrl.text, // kata kunci pencarian
       );
@@ -93,21 +114,40 @@ class _HistoryPageState extends State<HistoryPage> { // kelas state untuk Histor
     final List<TransactionItem> daftar = await _transaksi; // tunggu data transaksi selesai dimuat
     if (!mounted) return; // batalkan jika widget sudah dilepas
 
-    final total = _repo.hitungTotal(daftar); // hitung total masuk & keluar dari daftar
-    final String pesan = daftar.isEmpty // susun pesan sesuai ada/tidaknya hasil
-        ? '$_labelPeriode. Tidak ada transaksi.'
-        : '$_labelPeriode. ${daftar.length} transaksi. '
-            'Masuk ${CurrencyFormatter.spoken(total.masuk)}, '
-            'keluar ${CurrencyFormatter.spoken(total.keluar)}.';
+    final String pesan = _ringkasan(daftar); // susun pesan sesuai ada/tidaknya hasil
 
     SemanticsService.sendAnnouncement(View.of(context), pesan, Directionality.of(context)); // ucapkan pesan lewat pembaca layar
   }
 
-  /// Menerapkan pilihan periode (Hari Ini/Kemarin).
+  /// Satu kalimat ringkasan hasil, dipakai bersama oleh pengumuman
+  /// filter, ringkasan di atas daftar, dan penanda akhir daftar.
+  String _ringkasan(List<TransactionItem> daftar) {
+    if (daftar.isEmpty) return '$_labelPeriode. Tidak ada transaksi.';
+    final total = _repo.hitungTotal(daftar); // hitung total masuk & keluar dari daftar
+    return '$_labelPeriode. ${daftar.length} transaksi. '
+        'Masuk ${CurrencyFormatter.spoken(total.masuk)}, '
+        'keluar ${CurrencyFormatter.spoken(total.keluar)}.';
+  }
+
+  /// Menerapkan pilihan periode (Hari Ini/Tahun Ini/Riwayat).
   void _pilihPeriode(_RiwayatPeriode p) { // terapkan pilihan periode baru
     if (p == _periode) return; // sudah aktif, tidak perlu memuat ulang
     setState(() => _periode = p); // simpan periode baru
     _muat(); // muat ulang data sesuai periode baru
+    _umumkanHasil(); // umumkan hasilnya ke pembaca layar
+  }
+
+  /// Membuka dialog pilih bulan & tahun untuk periode Riwayat. Tahun
+  /// bisa dimundurkan tanpa batas, jadi transaksi lebih dari satu
+  /// tahun lalu tetap bisa dibuka tanpa menggulir daftar panjang.
+  Future<void> _pilihBulanRiwayat() async {
+    final DateTime? hasil = await showDialog<DateTime>( // tampilkan dialog, tunggu hasilnya
+      context: context,
+      builder: (_) => MonthPickerDialog(initialDate: _bulanRiwayat),
+    );
+    if (hasil == null || !mounted) return; // dibatalkan atau widget sudah dilepas
+    setState(() => _bulanRiwayat = hasil); // simpan bulan baru
+    _muat(); // muat ulang data bulan itu
     _umumkanHasil(); // umumkan hasilnya ke pembaca layar
   }
 
@@ -117,10 +157,8 @@ class _HistoryPageState extends State<HistoryPage> { // kelas state untuk Histor
     _umumkanHasil(); // umumkan hasilnya ke pembaca layar
   }
 
-  /// Sakelar dua pilihan periode: Hari Ini / Kemarin — menggantikan
-  /// dialog pemilih periode (preset minggu/bulan/semua + kalender),
-  /// sebab riwayat kini sengaja dibatasi ke dua hari terakhir saja.
-  Widget _buildTombolPeriode() { // bangun sakelar segmen dua pilihan periode
+  /// Sakelar tiga pilihan periode: Hari Ini / Tahun Ini / Riwayat.
+  Widget _buildTombolPeriode() { // bangun sakelar segmen tiga pilihan periode
     return Container(
       constraints: const BoxConstraints(minHeight: 40), // tinggi minimum sakelar
       decoration: BoxDecoration(
@@ -132,19 +170,27 @@ class _HistoryPageState extends State<HistoryPage> { // kelas state untuk Histor
         children: [
           Expanded(child: _buildSegmenPeriode('Hari Ini', _RiwayatPeriode.hariIni)),
           Container(width: 1, height: 22, color: context.warnaGaris), // pemisah antar segmen
-          Expanded(child: _buildSegmenPeriode('Kemarin', _RiwayatPeriode.kemarin)),
+          Expanded(child: _buildSegmenPeriode('Tahun Ini', _RiwayatPeriode.tahunIni)),
+          Container(width: 1, height: 22, color: context.warnaGaris), // pemisah antar segmen
+          Expanded(child: _buildSegmenPeriode('Riwayat', _RiwayatPeriode.riwayat)),
         ],
       ),
     );
   }
 
-  Widget _buildSegmenPeriode(String label, _RiwayatPeriode p) { // bangun satu segmen (Hari Ini atau Kemarin)
+  Widget _buildSegmenPeriode(String label, _RiwayatPeriode p) { // bangun satu segmen periode
     final bool terpilih = _periode == p; // status apakah segmen ini yang sedang aktif
     return Semantics( // info aksesibilitas untuk segmen ini
       button: true,
       selected: terpilih,
       label: label, // teks yang diucapkan pembaca layar
-      hint: terpilih ? null : 'Ketuk dua kali untuk memilih', // petunjuk aksi, kosong bila sudah aktif
+      // Riwayat diberi petunjuk tambahan karena perilakunya berbeda:
+      // menampilkan per bulan, bukan semua transaksi lama sekaligus.
+      hint: terpilih
+          ? null
+          : p == _RiwayatPeriode.riwayat
+              ? 'Ketuk dua kali untuk melihat transaksi lama per bulan'
+              : 'Ketuk dua kali untuk memilih', // petunjuk aksi, kosong bila sudah aktif
       onTap: () => _pilihPeriode(p), // aksi semantik saat diketuk
       excludeSemantics: true,
       child: InkWell( // efek ripple saat ditekan
@@ -159,7 +205,11 @@ class _HistoryPageState extends State<HistoryPage> { // kelas state untuk Histor
           alignment: Alignment.center,
           child: Text(
             label, // teks label segmen
-            overflow: TextOverflow.ellipsis, // potong dengan "..." jika kepanjangan
+            // Dua baris saat teks diperbesar: tiga segmen berbagi satu
+            // lebar layar, jadi "Tahun Ini" bisa tidak muat satu baris.
+            maxLines: 2,
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis, // potong dengan "..." jika masih kepanjangan
             style: AppTypography.labelSmall.copyWith(
               color: terpilih
                   ? Theme.of(context).colorScheme.onPrimary
@@ -238,13 +288,56 @@ class _HistoryPageState extends State<HistoryPage> { // kelas state untuk Histor
     );
   }
 
+  /// Tombol pilih bulan & tahun, hanya tampil saat periode Riwayat.
+  Widget _buildTombolBulan() {
+    return Semantics( // info aksesibilitas untuk tombol ini
+      button: true,
+      label: 'Pilih bulan: $_labelBulanRiwayat', // label yang diucapkan pembaca layar
+      hint: 'Ketuk dua kali untuk memilih bulan dan tahun lain',
+      onTap: _pilihBulanRiwayat, // aksi semantik saat diketuk
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: _pilihBulanRiwayat,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 48), // target sentuh minimum
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          decoration: BoxDecoration(
+            color: context.warnaKartu,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: context.warnaGarisInput), // batas kontrol ≥ 3:1
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.calendar_month_outlined, size: 18, color: context.warnaTeksMuted),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _labelBulanRiwayat, // mis. "Oktober 2026"
+                  style: AppTypography.labelSmall.copyWith(color: context.warnaTeksUtama),
+                ),
+              ),
+              Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: context.warnaTeksMuted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Group transaksi berdasarkan tanggal
   Map<String, List<TransactionItem>> _grupTransaksiByTanggal(List<TransactionItem> daftar) { // kelompokkan transaksi per label tanggal
+    // Map literal Dart menjaga urutan sisip, jadi cukup urutkan
+    // transaksinya dari waktu kejadian terbaru: kelompok tanggal ikut
+    // terurut dengan sendirinya. Sebelumnya label kelompok diurutkan
+    // sebagai teks, sehingga "9 Oktober" muncul di atas "14 Oktober".
+    final List<TransactionItem> terurut = [...daftar]
+      ..sort((a, b) => b.occurredAt.compareTo(a.occurredAt)); // terbaru lebih dulu
     final Map<String, List<TransactionItem>> grouped = {}; // wadah hasil pengelompokan
     final DateTime now = DateTime.now(); // tanggal & waktu sekarang
     final DateTime kemarin = now.subtract(const Duration(days: 1)); // tanggal kemarin
 
-    for (final trx in daftar) { // ulangi untuk setiap transaksi
+    for (final trx in terurut) { // ulangi untuk setiap transaksi
       final DateTime tgl = trx.occurredAt.toLocal(); // tanggal transaksi dalam waktu lokal
       final isSameDay = tgl.year == now.year && tgl.month == now.month && tgl.day == now.day; // cek apakah hari ini
       final isSameYesterday = tgl.year == kemarin.year && tgl.month == kemarin.month && tgl.day == kemarin.day; // cek apakah kemarin
@@ -273,16 +366,7 @@ class _HistoryPageState extends State<HistoryPage> { // kelas state untuk Histor
   /// viewport lazy-loading sendiri.
   Widget _buildGroupedTransactionList(List<TransactionItem> daftar) { // bangun daftar transaksi terkelompok per tanggal
     final grouped = _grupTransaksiByTanggal(daftar); // kelompokkan transaksi dulu
-    final sortedKeys = grouped.keys.toList(); // ambil semua label kelompok
-    // Sort dengan "Hari Ini" dan "Kemarin" paling atas
-    sortedKeys.sort((a, b) { // urutkan label kelompok
-      if (a == 'Hari Ini') return -1; // "Hari Ini" selalu paling atas
-      if (b == 'Hari Ini') return 1;
-      if (a == 'Kemarin') return -1; // "Kemarin" di bawah "Hari Ini"
-      if (b == 'Kemarin') return 1;
-      // Sort sisanya by tanggal descending (paling baru duluan)
-      return b.compareTo(a); // urutkan label tanggal lain secara menurun
-    });
+    final sortedKeys = grouped.keys.toList(); // label kelompok, sudah terurut dari tanggal terbaru
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -295,11 +379,14 @@ class _HistoryPageState extends State<HistoryPage> { // kelas state untuk Histor
             // baris terakhir kelompok sebelumnya.
             Padding( // header label tanggal kelompok
               padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
-              child: Text(
-                key, // teks label tanggal (mis. "Hari Ini")
-                style: AppTypography.labelSmall.copyWith(
-                  color: context.warnaTeksMuted,
-                  fontWeight: FontWeight.w700,
+              child: Semantics( // judul kelompok, bisa dilompati lewat navigasi Judul TalkBack
+                header: true,
+                child: Text(
+                  key, // teks label tanggal (mis. "Hari Ini")
+                  style: AppTypography.labelSmall.copyWith(
+                    color: context.warnaTeksMuted,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
@@ -377,6 +464,7 @@ class _HistoryPageState extends State<HistoryPage> { // kelas state untuk Histor
           // bergulir bersama sebagai satu kesatuan. Satu-satunya yang
           // tetap di tempat adalah tombol pemilih periode, lewat
           // SliverPersistentHeader(pinned: true) di bawah ini.
+          child: GetarAkhirGulir( // getaran ringan sekali saat daftar sampai dasar
           child: CustomScrollView( // area gulir tunggal berbasis sliver
             slivers: [
               SliverToBoxAdapter( // bungkus widget biasa agar bisa jadi sliver
@@ -386,10 +474,13 @@ class _HistoryPageState extends State<HistoryPage> { // kelas state untuk Histor
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 28), // jarak vertikal atas
-                      Text(
-                        'Riwayat Transaksi', // judul halaman
-                        style: AppTypography.headingMedium.copyWith(
-                          color: context.warnaTeksUtama,
+                      Semantics( // judul halaman untuk navigasi Judul TalkBack
+                        header: true,
+                        child: Text(
+                          'Transaksi', // judul halaman
+                          style: AppTypography.headingMedium.copyWith(
+                            color: context.warnaTeksUtama,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 16), // jarak vertikal
@@ -418,6 +509,7 @@ class _HistoryPageState extends State<HistoryPage> { // kelas state untuk Histor
                                   onPressed: () { // saat tombol hapus ditekan
                                     _cariCtrl.clear(); // kosongkan teks pencarian
                                     _muat(); // muat ulang data tanpa kata kunci
+                                    _umumkanHasil(); // umumkan hasil ke pembaca layar
                                   },
                                 ),
                           filled: true, // latar kolom terisi warna
@@ -428,11 +520,11 @@ class _HistoryPageState extends State<HistoryPage> { // kelas state untuk Histor
                           ),
                           border: OutlineInputBorder( // bentuk garis tepi default
                             borderRadius: BorderRadius.circular(26),
-                            borderSide: BorderSide(color: context.warnaGaris),
+                            borderSide: BorderSide(color: context.warnaGarisInput),
                           ),
                           enabledBorder: OutlineInputBorder( // garis tepi saat tidak fokus
                             borderRadius: BorderRadius.circular(26),
-                            borderSide: BorderSide(color: context.warnaGaris),
+                            borderSide: BorderSide(color: context.warnaGarisInput),
                           ),
                           focusedBorder: OutlineInputBorder( // garis tepi saat sedang fokus
                             borderRadius: BorderRadius.circular(26),
@@ -449,11 +541,9 @@ class _HistoryPageState extends State<HistoryPage> { // kelas state untuk Histor
                 ),
               ),
 
-              // ── Filter periode + jenis — bagian yang menempel ────
-              // Dua tombol sejajar dalam satu baris, sama tinggi
-              // (Expanded 50/50) — menggantikan tombol periode sendiri
-              // di atas deretan tiga chip jenis. Keduanya kini menempel
-              // saat halaman digulir, bukan cuma periode.
+              // ── Pilihan periode — bagian yang menempel ───────────
+              // Tiga pilihan selebar layar, tetap terlihat saat halaman
+              // digulir. Filter bulan & jenis ada di baris bawahnya.
               SliverPersistentHeader( // header yang menempel di atas saat digulir
                 pinned: true, // tetap terlihat, tidak ikut hilang saat digulir
                 delegate: _PeriodeHeaderDelegate( // delegate pengatur tinggi & isi header
@@ -464,13 +554,23 @@ class _HistoryPageState extends State<HistoryPage> { // kelas state untuk Histor
                     // akan tembus pandang bertumpuk dengan header.
                     color: Theme.of(context).scaffoldBackgroundColor, // latar buram sesuai tema
                     padding: const EdgeInsets.fromLTRB(18, 6, 18, 8),
-                    child: Row(
-                      children: [
-                        Expanded(child: _buildTombolPeriode()), // tombol periode, separuh lebar
+                    child: _buildTombolPeriode(), // tiga pilihan periode selebar layar
+                  ),
+                ),
+              ),
+
+              // ── Filter tambahan: bulan (khusus Riwayat) + jenis ──
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 4, 18, 12),
+                  child: Row(
+                    children: [
+                      if (_periode == _RiwayatPeriode.riwayat) ...[
+                        Expanded(child: _buildTombolBulan()), // pilih bulan & tahun
                         const SizedBox(width: 10), // jarak horizontal antar tombol
-                        Expanded(child: _buildTombolJenis()), // tombol jenis, separuh lebar
                       ],
-                    ),
+                      Expanded(child: _buildTombolJenis()), // pilih jenis transaksi
+                    ],
                   ),
                 ),
               ),
@@ -540,12 +640,20 @@ class _HistoryPageState extends State<HistoryPage> { // kelas state untuk Histor
                           // teks polos tanpa kartu maupun nominal —
                           // rincian Masuk/Keluar sudah ada di tiap
                           // baris transaksi sendiri-sendiri.
+                          //
+                          // Pembaca layar mendapat kalimat lengkap (periode,
+                          // jumlah, total) supaya sebelum menelusuri daftar
+                          // pengguna sudah tahu seberapa panjang isinya.
                           Padding(
                             padding: const EdgeInsets.only(bottom: 8),
-                            child: Text(
-                              '${daftar.length} transaksi', // jumlah transaksi hasil filter
-                              style: AppTypography.labelMedium.copyWith(
-                                color: context.warnaTeksMuted,
+                            child: Semantics(
+                              label: _ringkasan(daftar), // kalimat ringkasan lengkap
+                              excludeSemantics: true,
+                              child: Text(
+                                '${daftar.length} transaksi', // jumlah transaksi hasil filter
+                                style: AppTypography.labelMedium.copyWith(
+                                  color: context.warnaTeksMuted,
+                                ),
                               ),
                             ),
                           ),
@@ -560,6 +668,10 @@ class _HistoryPageState extends State<HistoryPage> { // kelas state untuk Histor
                             ),
                             child: _buildGroupedTransactionList(daftar), // daftar transaksi terkelompok per tanggal
                           ),
+                          PenandaAkhirHalaman( // dibacakan TalkBack setelah transaksi terakhir
+                            teks: 'Akhir daftar',
+                            labelSemantik: 'Akhir daftar. ${_ringkasan(daftar)}',
+                          ),
                         ],
                       ),
                     );
@@ -572,6 +684,7 @@ class _HistoryPageState extends State<HistoryPage> { // kelas state untuk Histor
               // tombol mic yang mengambang.
               const SliverToBoxAdapter(child: SizedBox(height: 120)), // jarak agar tak tertutup tombol mic
             ],
+          ),
           ),
         ),
       ),
