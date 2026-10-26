@@ -4,14 +4,15 @@ import 'package:flutter/semantics.dart'; // Untuk SemanticsService (pengumuman k
 import '../../../../core/services/aksesibilitas_controller.dart'; // Pola getaran berhasil/gagal
 import '../../../../core/theme/theme_extensions.dart'; // Warna sesuai tema
 import '../../../profile/data/profile_repository.dart'; // Penyimpanan data profil
+import '../../../profile/data/validasi_profil.dart'; // Aturan isian wajib & format
 import '../widgets/penanda_langkah.dart'; // Penanda "Langkah n dari 3"
 
 /// ─────────────────────────────────────────────────────────────────
 /// REGISTRASI PROFIL  –  Langkah 1 dari 3: isi informasi profil
 ///
-/// Isian sama dengan halaman Informasi Profil. Hanya Nama Lengkap yang
-/// wajib (dipakai untuk sapaan di Dashboard); sisanya boleh dikosongkan
-/// dan dilengkapi nanti lewat ikon edit di halaman Profil.
+/// Isian sama dengan halaman Informasi Profil, dengan aturan yang sama
+/// (lihat validasi_profil.dart): semua wajib kecuali Alamat. Pengguna
+/// tidak bisa lanjut ke langkah 2 sebelum semuanya benar.
 /// ─────────────────────────────────────────────────────────────────
 class RegistrasiProfilPage extends StatefulWidget {
   const RegistrasiProfilPage({super.key, required this.onLanjut});
@@ -29,9 +30,22 @@ class _RegistrasiProfilPageState extends State<RegistrasiProfilPage> {
   final _namaUsaha = TextEditingController();
   final _jenisUsaha = TextEditingController();
   final _alamat = TextEditingController();
-  final FocusNode _fokusNama = FocusNode();
+  /// Satu FocusNode per kolom, supaya fokus bisa langsung dipindah ke
+  /// kolom pertama yang salah.
+  final Map<TextEditingController, FocusNode> _fokus = {};
+  FocusNode _fokusUntuk(TextEditingController c) => _fokus.putIfAbsent(c, FocusNode.new);
 
-  String? _galatNama; // Pesan galat di bawah kolom Nama Lengkap
+  /// Pesan galat per kolom setelah tombol Lanjut ditekan.
+  final Map<TextEditingController, String> _galat = {};
+
+  /// Kolom wajib beserta nama & aturan formatnya. Alamat boleh kosong.
+  Map<TextEditingController, (String, String? Function(String))> get _aturan => {
+        _nama: ('Nama Lengkap', validasiWajib),
+        _email: ('Email', validasiEmail),
+        _noHp: ('Nomor HP', validasiNoHp),
+        _namaUsaha: ('Nama Usaha', validasiWajib),
+        _jenisUsaha: ('Jenis Usaha', validasiWajib),
+      };
   bool _menyimpan = false;
 
   @override
@@ -69,24 +83,40 @@ class _RegistrasiProfilPageState extends State<RegistrasiProfilPage> {
     for (final c in [_nama, _email, _noHp, _namaUsaha, _jenisUsaha, _alamat]) {
       c.dispose();
     }
-    _fokusNama.dispose();
+    for (final FocusNode f in _fokus.values) {
+      f.dispose();
+    }
     super.dispose();
   }
 
   Future<void> _lanjut() async {
     if (_menyimpan) return;
-    if (_nama.text.trim().isEmpty) {
-      const String pesan = 'Nama lengkap belum diisi.';
-      setState(() => _galatNama = pesan);
+    // Periksa semua kolom sekaligus, lalu sebutkan SEMUA yang salah dalam
+    // satu pengumuman — pengguna tunanetra tidak perlu menelusuri form
+    // untuk mencari kolom bertanda merah satu per satu.
+    _galat.clear();
+    final List<String> pesan = [];
+    TextEditingController? pertama;
+    _aturan.forEach((ctrl, aturan) {
+      final String? g = aturan.$2(ctrl.text.trim());
+      if (g != null) {
+        _galat[ctrl] = g;
+        pesan.add('${aturan.$1} $g');
+        pertama ??= ctrl;
+      }
+    });
+    if (pertama != null) {
+      setState(() {});
       AksesibilitasController.instance.getarGagal(); // Pola gagal: 2 getaran pendek
-      SemanticsService.sendAnnouncement(View.of(context), pesan, Directionality.of(context));
-      _fokusNama.requestFocus(); // Arahkan langsung ke kolom yang perlu diperbaiki
+      SemanticsService.sendAnnouncement(
+        View.of(context),
+        'Belum bisa lanjut. ${pesan.join('. ')}.',
+        Directionality.of(context),
+      );
+      _fokusUntuk(pertama!).requestFocus(); // Arahkan langsung ke kolom pertama yang salah
       return;
     }
-    setState(() {
-      _galatNama = null;
-      _menyimpan = true;
-    });
+    setState(() => _menyimpan = true);
     try {
       await ProfileRepository.instance.simpanInfoPribadi(
         nama: _nama.text.trim(),
@@ -114,16 +144,14 @@ class _RegistrasiProfilPageState extends State<RegistrasiProfilPage> {
     required TextEditingController controller,
     TextInputType? keyboard,
     int maxLines = 1,
-    bool wajib = false,
-    String? galat,
-    FocusNode? focusNode,
     TextInputAction aksi = TextInputAction.next,
   }) {
+    final bool wajib = _aturan.containsKey(controller);
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: TextField(
         controller: controller,
-        focusNode: focusNode,
+        focusNode: _fokusUntuk(controller),
         keyboardType: keyboard,
         maxLines: maxLines,
         textInputAction: maxLines > 1 ? TextInputAction.newline : aksi,
@@ -131,8 +159,12 @@ class _RegistrasiProfilPageState extends State<RegistrasiProfilPage> {
         decoration: InputDecoration(
           // labelText dibacakan TalkBack sebagai nama kolom.
           labelText: wajib ? '$label (wajib)' : '$label (boleh dikosongkan)',
-          errorText: galat,
+          errorText: _galat[controller] == null ? null : '$label ${_galat[controller]}',
+          errorMaxLines: 2,
         ),
+        onChanged: (_) {
+          if (_galat.remove(controller) != null) setState(() {}); // Hapus galat saat mulai diperbaiki
+        },
       ),
     );
   }
@@ -173,17 +205,12 @@ class _RegistrasiProfilPageState extends State<RegistrasiProfilPage> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Nama Anda dipakai untuk sapaan di Dashboard. Isian lain boleh dilengkapi nanti di Profil.',
+                      'Semua kolom wajib diisi, kecuali Alamat.',
                       style: TextStyle(fontSize: 15, color: context.warnaTeksMuted),
                     ),
                     const SizedBox(height: 16),
                     _judulBagian('DATA PRIBADI'),
-                    _kolom(
-                        label: 'Nama Lengkap',
-                        controller: _nama,
-                        wajib: true,
-                        galat: _galatNama,
-                        focusNode: _fokusNama),
+                    _kolom(label: 'Nama Lengkap', controller: _nama),
                     _kolom(label: 'Email', controller: _email, keyboard: TextInputType.emailAddress),
                     _kolom(label: 'Nomor HP', controller: _noHp, keyboard: TextInputType.phone),
                     _judulBagian('DATA USAHA'),

@@ -1,10 +1,11 @@
 import 'package:sqflite/sqflite.dart'; // Paket basis data SQLite
 
+import '../../../core/akuntansi/coa.dart'; // Kelompok akun COA (SAK EMKM)
 import '../../../core/database/database_helper.dart'; // Akses koneksi basis data
-import '../../transactions/data/transaction_model.dart'; // Model TransactionItem & TransactionType
+import '../../transactions/data/transaction_model.dart'; // Model TransactionItem
 import 'report_model.dart'; // Model LaporanBulanan & RincianKategori
 
-/// Perhitungan laporan bulanan.
+/// Perhitungan laporan laba rugi bulanan (SAK EMKM).
 ///
 /// Dipisah dari TransaksiRepository karena tanggung jawabnya berbeda:
 /// yang satu mengurus pencatatan, yang ini mengurus peringkasan.
@@ -14,40 +15,38 @@ import 'report_model.dart'; // Model LaporanBulanan & RincianKategori
 class LaporanRepository {
   Future<Database> get _db async => DatabaseHelper.instance.database; // Ambil koneksi basis data aktif
 
-  /// Laporan satu bulan, lengkap dengan pembanding bulan sebelumnya.
+  /// Laporan laba rugi satu bulan, lengkap dengan pembanding bulan
+  /// sebelumnya.
   Future<LaporanBulanan> laporanBulan({
     required int tahun,
     required int bulan,
   }) async {
-    final _Total bulanIni = await _hitungTotal(tahun, bulan); // Hitung total masuk/keluar bulan ini
-    final _Total bulanLalu = await _hitungTotal( // Hitung total bulan sebelumnya untuk pembanding
+    final List<RincianKategori> rincian =
+        await _rincianKategori(tahun, bulan, denganTransaksi: true); // Semua akun bulan ini, beserta transaksinya
+    final List<RincianKategori> rincianLalu = await _rincianKategori( // Akun bulan lalu, cukup totalnya
       bulan == 1 ? tahun - 1 : tahun, // Bila Januari, bulan lalu ada di tahun sebelumnya
       bulan == 1 ? 12 : bulan - 1, // Bila Januari, bulan lalu adalah Desember
+      denganTransaksi: false,
     );
 
-    final List<RincianKategori> pendapatan = await _rincianKategori( // Rincian per kategori untuk pemasukan
-      tahun,
-      bulan,
-      TransactionType.masuk,
-    );
-    final List<RincianKategori> beban = await _rincianKategori( // Rincian per kategori untuk pengeluaran
-      tahun,
-      bulan,
-      TransactionType.keluar,
+    // Pembanding memakai susunan laba rugi yang sama dengan bulan ini,
+    // supaya "naik/turun" membandingkan hal yang setara.
+    final LaporanBulanan lalu = LaporanBulanan(
+      tahun: tahun,
+      bulan: bulan,
+      jumlahTransaksi: rincianLalu.fold(0, (n, r) => n + r.jumlahTransaksi),
+      rincian: rincianLalu,
     );
 
     return LaporanBulanan(
       tahun: tahun,
       bulan: bulan,
-      totalPendapatan: bulanIni.masuk,
-      totalBeban: bulanIni.keluar,
-      jumlahTransaksi: bulanIni.jumlah,
-      rincianPendapatan: pendapatan,
-      rincianBeban: beban,
+      jumlahTransaksi: rincian.fold(0, (n, r) => n + r.jumlahTransaksi),
+      rincian: rincian,
       // Null bila bulan lalu memang tidak punya transaksi, agar narasi
       // tidak menyebut perbandingan yang tidak bermakna.
-      pendapatanBulanLalu: bulanLalu.jumlah == 0 ? null : bulanLalu.masuk,
-      bebanBulanLalu: bulanLalu.jumlah == 0 ? null : bulanLalu.keluar,
+      pendapatanBulanLalu: lalu.jumlahTransaksi == 0 ? null : lalu.totalPendapatan,
+      bebanBulanLalu: lalu.jumlahTransaksi == 0 ? null : lalu.totalBeban,
     );
   }
 
@@ -89,71 +88,60 @@ class LaporanRepository {
 
   // ── Internal ──────────────────────────────────────────────────────
 
-  Future<_Total> _hitungTotal(int tahun, int bulan) async {
-    final Database db = await _db;
-    final (String mulai, String selesai) = _batasBulanUtc(tahun, bulan); // Rentang waktu UTC awal-akhir bulan
-
-    final List<Map<String, Object?>> hasil = await db.rawQuery('''
-      SELECT
-        COALESCE(SUM(CASE WHEN type = 'masuk'  THEN nominal END), 0) AS masuk,
-        COALESCE(SUM(CASE WHEN type = 'keluar' THEN nominal END), 0) AS keluar,
-        COUNT(*) AS jumlah
-      FROM transaksi
-      WHERE deleted_at IS NULL
-        AND occurred_at >= ? AND occurred_at < ?
-    ''', [mulai, selesai]);
-    // Query di atas: jumlahkan nominal masuk dan keluar terpisah,
-    // plus hitung total baris, dalam satu kali baca tabel.
-
-    return _Total(
-      masuk: (hasil.first['masuk'] as num).toInt(),
-      keluar: (hasil.first['keluar'] as num).toInt(),
-      jumlah: (hasil.first['jumlah'] as num).toInt(),
-    );
-  }
-
+  /// Total per kategori untuk satu bulan, terbesar dulu.
+  ///
+  /// Kelompok akun diambil dari tabel kategori (transaksi menyimpan
+  /// nama kategori sebagai teks). Kategori yang sudah dihapus atau tidak
+  /// ditemukan jatuh ke kelompok bawaan per jenis transaksi.
   Future<List<RincianKategori>> _rincianKategori(
     int tahun,
-    int bulan,
-    TransactionType type,
-  ) async {
+    int bulan, {
+    required bool denganTransaksi,
+  }) async {
     final Database db = await _db;
     final (String mulai, String selesai) = _batasBulanUtc(tahun, bulan);
 
-    // Step 1: ringkasan per kategori
+    // Step 1: ringkasan per kategori, beserta kelompok akunnya
     final List<Map<String, Object?>> baris = await db.rawQuery('''
-      SELECT kategori,
-             SUM(nominal) AS total,
-             COUNT(*)     AS jumlah
-      FROM transaksi
-      WHERE deleted_at IS NULL AND type = ?
-        AND occurred_at >= ? AND occurred_at < ?
-      GROUP BY kategori
+      SELECT t.kategori      AS kategori,
+             t.type          AS type,
+             k.kelompok      AS kelompok,
+             SUM(t.nominal)  AS total,
+             COUNT(*)        AS jumlah
+      FROM transaksi t
+      LEFT JOIN kategori k ON k.nama = t.kategori AND k.type = t.type
+      WHERE t.deleted_at IS NULL
+        AND t.occurred_at >= ? AND t.occurred_at < ?
+      GROUP BY t.kategori, t.type
       ORDER BY total DESC
-    ''', [type.name, mulai, selesai]);
-    // Query di atas: total nominal & jumlah transaksi per kategori,
-    // diurutkan dari kategori terbesar ke terkecil.
+    ''', [mulai, selesai]);
 
-    // Step 2: untuk setiap kategori, ambil detail transaksinya
+    // Step 2: untuk setiap kategori, ambil detail transaksinya bila perlu
     final List<RincianKategori> hasil = [];
     for (final b in baris) { // Ulangi untuk setiap kategori yang ditemukan
       final String namaKat = b['kategori']! as String;
+      final String type = b['type']! as String;
 
-      final List<Map<String, Object?>> detailBaris = await db.query( // Ambil semua transaksi milik kategori ini
-        'transaksi',
-        where: 'deleted_at IS NULL AND type = ? '
-            'AND kategori = ? AND occurred_at >= ? AND occurred_at < ?',
-        whereArgs: [type.name, namaKat, mulai, selesai],
-        orderBy: 'occurred_at DESC',
-      );
-
-      final List<TransactionItem> items =
-          detailBaris.map(TransactionItem.fromMap).toList(); // Ubah tiap baris jadi objek TransactionItem
+      List<TransactionItem> items = const [];
+      if (denganTransaksi) {
+        final List<Map<String, Object?>> detailBaris = await db.query( // Ambil semua transaksi milik kategori ini
+          'transaksi',
+          where: 'deleted_at IS NULL AND type = ? '
+              'AND kategori = ? AND occurred_at >= ? AND occurred_at < ?',
+          whereArgs: [type, namaKat, mulai, selesai],
+          orderBy: 'occurred_at DESC',
+        );
+        items = detailBaris.map(TransactionItem.fromMap).toList(); // Ubah tiap baris jadi objek TransactionItem
+      }
 
       hasil.add(RincianKategori(
         nama: namaKat,
         total: (b['total'] as num).toInt(),
         jumlahTransaksi: (b['jumlah'] as num).toInt(),
+        kelompok: KelompokAkun.dariKode(
+          b['kelompok'] as String?,
+          masuk: type == 'masuk',
+        ),
         transaksi: items,
       ));
     }
@@ -175,16 +163,4 @@ class LaporanRepository {
       selesai.toUtc().toIso8601String(),
     );
   }
-}
-
-class _Total { // Struktur sederhana hasil penjumlahan satu bulan
-  final int masuk; // Total pemasukan
-  final int keluar; // Total pengeluaran
-  final int jumlah; // Jumlah transaksi
-
-  const _Total({
-    required this.masuk,
-    required this.keluar,
-    required this.jumlah,
-  });
 }

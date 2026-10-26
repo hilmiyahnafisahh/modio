@@ -36,9 +36,12 @@ VoiceNavTarget? deteksiPerintahNavigasi(String teksAsli) { // Deteksi tujuan nav
 
   if (teks.contains('chat ai') || // Cek berbagai frasa yang merujuk Asisten AI
       teks.contains('ai chat') ||
-      teks.contains('asisten ai') ||
-      teks.contains('analisis ai')) {
+      teks.contains('asisten ai')) {
     return VoiceNavTarget.aiChat; // Langsung kembalikan tujuan Asisten AI tanpa perlu prefix
+  }
+  // Analisis AI ada sebagai card di halaman Laporan.
+  if (teks.contains('analisis ai') || teks.contains('analisa ai')) {
+    return VoiceNavTarget.laporan;
   }
 
   String? sisa; // Teks setelah prefix navigasi dibuang
@@ -82,6 +85,17 @@ VoiceNavTarget? deteksiPerintahNavigasi(String teksAsli) { // Deteksi tujuan nav
 
   return null; // Tidak ada tujuan yang cocok
 }
+
+/// Mengenali perintah suara untuk keluar dari aplikasi, mis. "tutup
+/// aplikasi" atau "keluar dari Modio". "tutup"/"keluar" harus LANGSUNG
+/// diikuti "aplikasi"/"modio" (boleh disela "dari"), supaya ucapan
+/// transaksi seperti "keluar uang buat langganan aplikasi" tidak pernah
+/// dianggap perintah keluar.
+bool perintahTutupAplikasi(String teksAsli) =>
+    _polaTutupAplikasi.hasMatch(teksAsli.trim().toLowerCase());
+
+final RegExp _polaTutupAplikasi =
+    RegExp(r'\b(tutup|keluar)\s+(dari\s+)?(aplikasi|modio)');
 
 /// Nama halaman yang diumumkan lewat TalkBack begitu navigasi suara
 /// berhasil — supaya pengguna tunanetra tahu ia benar mendarat di

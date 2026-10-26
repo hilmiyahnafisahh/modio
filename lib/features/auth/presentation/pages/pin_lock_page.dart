@@ -66,9 +66,13 @@ class _PinLockPageState extends State<PinLockPage> {
   /// SAMPING keypad, tidak pernah menggantikannya.
   bool get _bisaSuara =>
       _tahap == _Tahap.masuk && KeamananController.instance.suaraAktif.value; // Opsi suara hanya relevan saat login, bukan saat membuat PIN baru
+  // Tombol Sidik Jari selalu tampil di layar masuk, tidak menunggu
+  // sakelar Profil dinyalakan dulu. Sakelar biometrikAktif hanya
+  // mengatur apakah permintaan sidik jari muncul OTOMATIS saat layar
+  // terbuka (lihat _mulai). Di HP tanpa sidik jari, menekan tombol ini
+  // memberi tahu bahwa biometrik tidak tersedia.
   bool get _bisaBiometrik =>
-      KeamananController.biometrikTersedia && // Dimatikan sementara selama masih pengembangan
-      _tahap == _Tahap.masuk && KeamananController.instance.biometrikAktif.value; // Sama halnya untuk biometrik
+      KeamananController.biometrikTersedia && _tahap == _Tahap.masuk;
 
   @override
   void initState() { // Dipanggil sekali saat halaman pertama dibuat
@@ -113,7 +117,7 @@ class _PinLockPageState extends State<PinLockPage> {
     // yang mengaktifkannya di Profil biasanya berharap ini otomatis,
     // sama seperti pola umum aplikasi perbankan. Keypad PIN tetap utuh
     // di belakangnya kalau pengguna membatalkan atau biometrik gagal.
-    if (ada && kunci == 0 && _bisaBiometrik) {
+    if (ada && kunci == 0 && _bisaBiometrik && KeamananController.instance.biometrikAktif.value) {
       // Jeda sebentar supaya halaman (dan pengumuman judul di atas)
       // sempat selesai tampil/dibacakan dulu sebelum prompt sistem
       // menimpanya — tanpa ini keduanya tumpang tindih.
@@ -305,6 +309,12 @@ class _PinLockPageState extends State<PinLockPage> {
       if (!mounted) return; // Batalkan jika widget sudah dilepas selama menunggu prompt
 
       if (berhasil) { // Biometrik cocok
+        // Dipakai pertama kali lewat tombol: aktifkan supaya pembukaan
+        // berikutnya langsung meminta sidik jari secara otomatis.
+        if (!KeamananController.instance.biometrikAktif.value) {
+          await KeamananController.instance.ubahBiometrik(true);
+          if (!mounted) return;
+        }
         _umumkan('Biometrik berhasil. Membuka aplikasi.'); // Umumkan keberhasilan
         AksesibilitasController.instance.getarBerhasil(); // Pola berhasil, sama seperti PIN benar
         widget.onBerhasil(); // Panggil callback sukses
@@ -321,6 +331,7 @@ class _PinLockPageState extends State<PinLockPage> {
   }
 
   Future<bool> _sidikJariTersedia() async { // HP punya sensor DAN sidik jari terdaftar?
+    if (!KeamananController.biometrikTersedia) return false; // Fitur dimatikan dari sakelar utama
     try {
       return await _localAuth.isDeviceSupported() && await _localAuth.canCheckBiometrics;
     } catch (_) {

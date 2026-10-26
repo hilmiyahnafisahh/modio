@@ -215,7 +215,7 @@ class _DashboardPageState extends State<DashboardPage> { // Kelas State: tempat 
                 const SizedBox(height: 20), // Jarak 20 pixel setelah daftar transaksi
 
                 AiAssistantBanner( // Banner ajakan membuka fitur Asisten AI
-                  onAnalysisTap: widget.onOpenReports ?? () {}, // Saat bagian "analisis" ditekan, buka tab Laporan (atau tidak lakukan apa-apa jika callback kosong)
+                  onAnalysisTap: widget.onOpenReports ?? () {}, // Buka tab Laporan, tempat card Analisis AI berada
                   onChatTap: widget.onOpenAiChat ?? () {}, // Saat bagian "chat" ditekan, buka Asisten AI (atau tidak lakukan apa-apa jika callback kosong)
                 ),
 

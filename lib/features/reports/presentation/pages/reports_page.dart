@@ -2,17 +2,15 @@ import 'package:flutter/material.dart'; // widget dasar Flutter (Scaffold, Text,
 import 'package:flutter/semantics.dart'; // untuk mengumumkan info ke pembaca layar (TalkBack)
 import 'package:flutter/services.dart'; // untuk SystemUiOverlayStyle (warna status bar)
 
-import '../../../../core/navigation/app_route.dart'; // helper buatRute() untuk navigasi antar halaman
 import '../../../../core/widgets/akhir_halaman.dart'; // penanda & getaran saat halaman sampai dasar
 import '../../../../core/widgets/month_picker_dialog.dart'; // dialog pemilih bulan & tahun bersama
 import '../../../../core/theme/app_typography.dart'; // kumpulan gaya teks (font, ukuran) aplikasi
 import '../../../../core/theme/theme_extensions.dart'; // ekstensi warna tema (context.warnaX, context.gelap)
 import '../../../../core/utils/currency_formatter.dart'; // format angka menjadi teks Rupiah
+import '../../../../core/akuntansi/coa.dart'; // kelompok akun COA untuk susunan laba rugi
 import '../../data/laporan_repository.dart'; // sumber data laporan keuangan bulanan
 import '../../data/report_model.dart'; // model data LaporanBulanan, RincianKategori, dll
-import '../widgets/ai_analysis_sheet.dart'; // lembar saran AI untuk laporan bulan ini
-import '../../../ai_chat/presentation/pages/ai_assistant_page.dart'; // halaman asisten AI
-import '../../../dashboard/presentation/widgets/ai_assistant_banner.dart'; // banner ajakan asisten AI
+import '../widgets/ai_analysis_card.dart'; // card analisis AI di halaman laporan
 import '../../../dashboard/presentation/widgets/balance_card.dart'; // kartu saldo/laba yang dipakai bareng dashboard
 import '../../../transactions/presentation/widgets/voice_transaction_flow.dart'; // alur catat transaksi via suara
 
@@ -244,55 +242,97 @@ class _ReportsPageState extends State<ReportsPage> { // kelas state untuk Report
   }
 
   Widget _buildIsi(LaporanBulanan l) { // bangun isi laporan setelah data siap
+    // Satu kartu rincian per kelompok akun. Warna & ikon mengikuti arah
+    // uangnya (masuk/keluar), judul mengikuti nama kelompok SAK EMKM.
+    Widget seksi(KelompokAkun k, String subjudul, {required bool masuk}) =>
+        _SeksiKeuangan(
+          judul: k.label,
+          subjudul: subjudul,
+          total: l.totalKelompok(k),
+          totalWarna: masuk ? context.warnaMasuk : context.warnaKeluar,
+          icon: masuk ? Icons.arrow_outward_rounded : Icons.south_west_rounded,
+          iconBgColor: masuk ? context.latarMasuk : context.latarKeluar,
+          iconColor: masuk ? context.warnaMasuk : context.warnaKeluar,
+          rincian: l.rincianKelompok(k),
+          dotWarna: masuk ? context.warnaMasuk : context.warnaKeluar,
+        );
+    bool ada(KelompokAkun k) => l.rincianKelompok(k).isNotEmpty;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Kartu Laba Usaha ─────────────────────────────────
+        // ── Kartu Laba Bersih ────────────────────────────────
         // Widget yang sama dengan kartu Saldo di dashboard, agar
         // gaya visualnya senada — bukan kartu terpisah dengan
         // tampilan sendiri.
         BalanceCard( // kartu ringkasan laba/rugi
           balance: l.labaBersih.abs(), // nilai absolut laba/rugi
           period: l.labelPeriode, // label periode laporan
-          title: l.untung ? 'Laba Usaha' : 'Rugi', // judul sesuai status untung/rugi
+          title: l.untung ? 'Laba Bersih' : 'Rugi Bersih', // judul sesuai status untung/rugi
         ),
         const SizedBox(height: 20), // jarak vertikal
 
-        // ── Kartu Pendapatan ─────────────────────────────────
-        _SeksiKeuangan( // kartu rincian pendapatan
-          judul: 'Pendapatan',
-          subjudul: 'Hasil penjualan',
-          total: l.totalPendapatan, // total nilai pendapatan
-          totalWarna: context.warnaMasuk, // warna khas transaksi masuk
-          icon: Icons.arrow_outward_rounded, // ikon panah keluar (uang masuk)
-          iconBgColor: context.latarMasuk, // warna latar lingkaran ikon
-          iconColor: context.warnaMasuk, // warna ikon & garis tepinya
-          rincian: l.rincianPendapatan, // daftar kategori pendapatan
-          dotWarna: context.warnaMasuk, // warna titik penanda kategori
-        ),
-        const SizedBox(height: 16), // jarak vertikal
+        // ── Susunan laba rugi (SAK EMKM) ─────────────────────
+        // Urutan kartu = urutan baca laporan laba rugi. Pendapatan &
+        // beban usaha selalu tampil; kelompok lain hanya bila ada isinya,
+        // supaya pengguna TalkBack tidak menelusuri kartu kosong.
+        seksi(KelompokAkun.pendapatanUsaha, 'Penjualan dan jasa', masuk: true),
+        const SizedBox(height: 16),
+        if (ada(KelompokAkun.hargaPokok)) ...[
+          seksi(KelompokAkun.hargaPokok, 'Bahan baku, barang dagang, kemasan', masuk: false),
+          const SizedBox(height: 12),
+          _BarisSubtotal(label: 'Laba Kotor', nilai: l.labaKotor),
+          const SizedBox(height: 16),
+        ],
+        seksi(KelompokAkun.bebanUsaha, 'Biaya menjalankan usaha', masuk: false),
+        const SizedBox(height: 12),
+        _BarisSubtotal(label: 'Laba Usaha', nilai: l.labaUsaha),
+        const SizedBox(height: 16),
+        if (ada(KelompokAkun.pendapatanLain)) ...[
+          seksi(KelompokAkun.pendapatanLain, 'Di luar kegiatan usaha utama', masuk: true),
+          const SizedBox(height: 16),
+        ],
+        if (ada(KelompokAkun.bebanLain)) ...[
+          seksi(KelompokAkun.bebanLain, 'Bunga dan biaya bank', masuk: false),
+          const SizedBox(height: 16),
+        ],
+        if (ada(KelompokAkun.bebanPajak)) ...[
+          _BarisSubtotal(label: 'Laba Sebelum Pajak', nilai: l.labaSebelumPajak),
+          const SizedBox(height: 16),
+          seksi(KelompokAkun.bebanPajak, 'Pajak penghasilan', masuk: false),
+          const SizedBox(height: 16),
+        ],
+        _BarisSubtotal(label: 'Laba Bersih', nilai: l.labaBersih, utama: true),
+        const SizedBox(height: 20),
 
-        // ── Kartu Beban Biaya ────────────────────────────────
-        _SeksiKeuangan( // kartu rincian beban biaya
-          judul: 'Beban Biaya',
-          subjudul: 'Biaya biaya yang keluar',
-          total: l.totalBeban, // total nilai beban
-          totalWarna: context.warnaKeluar, // warna khas transaksi keluar
-          icon: Icons.south_west_rounded, // ikon panah masuk (uang keluar)
-          iconBgColor: context.latarKeluar, // warna latar lingkaran ikon
-          iconColor: context.warnaKeluar, // warna ikon & garis tepinya
-          rincian: l.rincianBeban, // daftar kategori beban
-          dotWarna: context.warnaKeluar, // warna titik penanda kategori
-        ),
-        const SizedBox(height: 20), // jarak vertikal
+        // ── Di luar laba rugi ────────────────────────────────
+        // Modal, prive, pinjaman, dan pembelian aset tetap: uangnya
+        // memang bergerak, tetapi bukan pendapatan atau beban.
+        if (l.diLuarLabaRugi.isNotEmpty) ...[
+          _SeksiKeuangan(
+            judul: 'Di Luar Laba Rugi',
+            subjudul: 'Modal, prive, pinjaman, aset',
+            total: l.diLuarLabaRugi.fold(0, (n, r) => n + r.total),
+            totalWarna: context.warnaInfo,
+            icon: Icons.account_balance_outlined,
+            iconBgColor: context.latarInfo,
+            iconColor: context.warnaInfo,
+            rincian: l.diLuarLabaRugi,
+            dotWarna: context.warnaInfo,
+          ),
+          const SizedBox(height: 20),
+        ],
 
         // ── Asisten Keuangan ─────────────────────────────────
-        _AsistenKeuanganSection(laporan: l), // bagian ajakan pakai asisten AI
+        // Analisis AI langsung di halaman ini (tersimpan per bulan);
+        // key per bulan supaya ganti bulan memuat analisis bulan itu.
+        AnalisisAiCard(key: ValueKey('${l.tahun}-${l.bulan}'), laporan: l),
+        const SizedBox(height: 20),
 
         PenandaAkhirHalaman( // dibacakan TalkBack setelah elemen terakhir
           teks: 'Akhir laporan',
           labelSemantik: 'Akhir laporan ${l.labelPeriode}. '
-              '${l.untung ? 'Laba' : 'Rugi'} ${CurrencyFormatter.spoken(l.labaBersih.abs())}.',
+              '${l.untung ? 'Laba' : 'Rugi'} bersih ${CurrencyFormatter.spoken(l.labaBersih.abs())}.',
         ),
       ],
     );
@@ -713,6 +753,62 @@ class _SeksiKeuangan extends StatelessWidget { // kartu tampilan Pendapatan/Beba
   }
 }
 
+/// Baris hasil antara laporan laba rugi (Laba Kotor, Laba Usaha, Laba
+/// Bersih). Nilai negatif dibaca & ditulis sebagai rugi, bukan "minus",
+/// supaya pengguna tunanetra langsung tahu arahnya.
+class _BarisSubtotal extends StatelessWidget {
+  const _BarisSubtotal({
+    required this.label,
+    required this.nilai,
+    this.utama = false,
+  });
+
+  final String label; // mis. "Laba Kotor"
+  final int nilai; // hasil perhitungan, boleh negatif
+  final bool utama; // true untuk Laba Bersih: tampil lebih menonjol
+
+  @override
+  Widget build(BuildContext context) {
+    final bool rugi = nilai < 0;
+    final String labelAkhir = rugi ? label.replaceFirst('Laba', 'Rugi') : label;
+    final Color warna = rugi ? context.warnaKeluar : context.warnaMasuk;
+
+    return Semantics(
+      header: utama, // Laba Bersih bisa dilompati lewat navigasi Judul TalkBack
+      label: '$labelAkhir ${CurrencyFormatter.spoken(nilai.abs())}',
+      excludeSemantics: true,
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: utama ? 16 : 12),
+        decoration: BoxDecoration(
+          color: utama ? (rugi ? context.latarKeluar : context.latarMasuk) : context.warnaKartu,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: utama ? warna : context.warnaGaris, width: utama ? 1.5 : 1),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                labelAkhir,
+                style: (utama ? AppTypography.titleMedium : AppTypography.labelLarge)
+                    .copyWith(color: context.warnaTeksUtama),
+              ),
+            ),
+            Text(
+              CurrencyFormatter.format(nilai.abs()),
+              style: TextStyle(
+                fontSize: utama ? 17 : 15,
+                fontWeight: FontWeight.w700,
+                color: warna,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Satu baris kategori dalam kartu Pendapatan/Beban Biaya.
 ///
 /// Daftar transaksinya bisa dibuka-tutup sendiri, terpisah dari
@@ -859,27 +955,6 @@ class _KategoriRincianTileState extends State<_KategoriRincianTile> {
             ),
           ),
       ],
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Bagian Asisten Keuangan  –  pakai AiAssistantBanner yang sama dengan dashboard
-// ─────────────────────────────────────────────────────────────────────────────
-class _AsistenKeuanganSection extends StatelessWidget { // bagian ajakan pakai asisten AI
-  const _AsistenKeuanganSection({required this.laporan});
-
-  final LaporanBulanan laporan; // laporan bulan yang sedang dibuka, untuk dianalisis AI
-
-  @override
-  Widget build(BuildContext context) {
-    return AiAssistantBanner( // banner ajakan analisis/chat dengan AI
-      onAnalysisTap: () => tampilkanAnalisisAi(context, laporan), // minta saran AI untuk bulan ini
-      // Chat masih dummy, jadi tetap membuka halaman asisten.
-      onChatTap: () => Navigator.push( // buka halaman asisten AI saat "Chat" ditekan
-        context,
-        buatRute((_) => const AiAssistantPage()),
-      ),
     );
   }
 }

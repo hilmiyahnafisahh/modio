@@ -36,4 +36,5 @@ class ApiConstants { // Kumpulan konstanta terkait komunikasi API
   // ── Endpoint Auth ────────────────────────────────────────────────
   static const String login          = '/auth/login'; // Endpoint login
   static const String logout         = '/auth/logout'; // Endpoint logout
+
 }

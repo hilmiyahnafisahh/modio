@@ -53,9 +53,9 @@ void main() {
 
     expect(find.text('Nama Lengkap (wajib)'), findsOneWidget); // Label kolom dibacakan TalkBack
     await tester.tap(find.text('Lanjut'));
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300)); // Selesaikan jeda pola getar gagal
 
-    expect(find.text('Nama lengkap belum diisi.'), findsOneWidget);
+    expect(find.text('Nama Lengkap wajib diisi'), findsOneWidget);
     expect(lanjut, isFalse);
   });
 }

@@ -2,6 +2,7 @@ import 'dart:async'; // Untuk Timer (jeda hening deteksi selesai bicara)
 
 import 'package:flutter/material.dart'; // Widget dan tema dasar Flutter
 import 'package:flutter/semantics.dart'; // Untuk mengirim pengumuman ke screen reader
+import 'package:flutter/services.dart'; // SystemNavigator untuk menutup aplikasi lewat suara
 import 'package:speech_to_text/speech_to_text.dart' as  stt; // Plugin pengenalan suara jadi teks
 
 import '../../../../core/services/aksesibilitas_controller.dart'; // Pola getaran berhasil/gagal
@@ -174,6 +175,21 @@ String? _pesanIsianKurang(ParsedTransaction hasil) {
 Future<bool?> mulaiCatatTransaksiSuara(BuildContext context) async { // Entry point tombol mic global
   final String? teks = await dengarkanUcapan(context); // Dengarkan ucapan pengguna, tunggu hasilnya
   if (teks == null || teks.trim().isEmpty || !context.mounted) return null; // Batalkan jika kosong/dibatalkan
+
+  if (perintahTutupAplikasi(teks)) { // "tutup aplikasi" / "keluar dari aplikasi"
+    AksesibilitasController.instance.getarBerhasil(); // Pola berhasil: 1 getaran pendek
+    SemanticsService.sendAnnouncement(
+      View.of(context),
+      'Menutup aplikasi Modio',
+      Directionality.of(context),
+    );
+    // Jeda sebentar supaya pengumuman sempat dibacakan TalkBack sebelum
+    // aplikasi tertutup. Catatan sudah tersimpan otomatis di HP, jadi
+    // tidak ada data yang hilang.
+    await Future<void>.delayed(const Duration(milliseconds: 1500));
+    await SystemNavigator.pop();
+    return null;
+  }
 
   final VoiceNavTarget? tujuanNavigasi = deteksiPerintahNavigasi(teks); // Cek apakah ucapan berupa perintah navigasi
   if (tujuanNavigasi != null) { // Jika terdeteksi sebagai perintah navigasi

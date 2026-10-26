@@ -1,6 +1,8 @@
 import 'package:path/path.dart' as p; // Utilitas gabung path file
 import 'package:sqflite/sqflite.dart'; // Paket basis data SQLite untuk Flutter
 
+import '../akuntansi/coa.dart'; // Bagan akun bawaan & aturan migrasi kategori
+
 /// Basis data lokal. Satu berkas di penyimpanan privat aplikasi.
 ///
 /// ATURAN WAKTU: semua kolom waktu disimpan sebagai teks ISO 8601 dalam
@@ -16,7 +18,7 @@ class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._(); // Satu-satunya instance di seluruh aplikasi
 
   static const String _namaBerkas = 'modio.db'; // Nama berkas basis data
-  static const int _versi = 2; // Nomor versi skema saat ini
+  static const int _versi = 4; // Nomor versi skema saat ini (3: kategori = akun COA, 4: akun Konsumsi)
 
   Database? _db; // Koneksi basis data, null sebelum pertama kali dibuka
 
@@ -61,12 +63,14 @@ class DatabaseHelper {
 
     await db.execute('''
       CREATE TABLE kategori (
-        id    INTEGER PRIMARY KEY AUTOINCREMENT,
-        nama  TEXT NOT NULL,
-        type  TEXT NOT NULL CHECK (type IN ('masuk','keluar')),
+        id        INTEGER PRIMARY KEY AUTOINCREMENT,
+        nama      TEXT NOT NULL,
+        type      TEXT NOT NULL CHECK (type IN ('masuk','keluar')),
+        kode      TEXT,
+        kelompok  TEXT NOT NULL DEFAULT '',
         UNIQUE (nama, type)
       )
-    '''); // Buat tabel kategori, nama+type harus unik bersama
+    '''); // Buat tabel kategori (= akun COA), nama+type harus unik bersama
 
     await db.execute('''
       CREATE TABLE pengaturan (
@@ -81,25 +85,13 @@ class DatabaseHelper {
   Future<void> _isiDataAwal(Database db) async {
     final Batch batch = db.batch(); // Kumpulkan banyak perintah jadi satu batch untuk efisiensi
 
-    const List<List<String>> kategoriBawaan = [ // Daftar kategori default: [nama, jenis]
-      ['Penjualan', 'masuk'],
-      ['Jasa', 'masuk'],
-      ['Iuran Anggota', 'masuk'],
-      ['Donasi', 'masuk'],
-      ['Modal Masuk', 'masuk'],
-      ['Pemasukan Lain', 'masuk'],
-      ['Bahan Baku', 'keluar'],
-      ['Transportasi', 'keluar'],
-      ['Gaji', 'keluar'],
-      ['Sewa', 'keluar'],
-      ['Listrik dan Air', 'keluar'],
-      ['Peralatan', 'keluar'],
-      ['Kegiatan', 'keluar'],
-      ['Pengeluaran Lain', 'keluar'],
-    ];
-
-    for (final k in kategoriBawaan) { // Tambahkan tiap kategori bawaan ke batch
-      batch.insert('kategori', {'nama': k[0], 'type': k[1]});
+    for (final AkunBawaan a in akunBawaan) { // Tambahkan tiap akun COA bawaan ke batch
+      batch.insert('kategori', {
+        'nama': a.nama,
+        'type': a.type,
+        'kode': a.kode,
+        'kelompok': a.kelompok.kode,
+      });
     }
 
     batch.insert('pengaturan', {'kunci': 'saldo_awal', 'nilai': '0'}); // Saldo awal default 0
@@ -179,6 +171,88 @@ class DatabaseHelper {
           ],
         ); // Bersihkan kunci pengaturan lama yang sudah tidak dipakai
       });
+    }
+
+    if (lama < 3) { // Versi 3: kategori menjadi akun COA (SAK EMKM)
+      await db.transaction((txn) async {
+        await txn.execute('ALTER TABLE kategori ADD COLUMN kode TEXT');
+        await txn.execute(
+          "ALTER TABLE kategori ADD COLUMN kelompok TEXT NOT NULL DEFAULT ''",
+        );
+
+        // Ganti nama kategori bawaan lama, di tabel kategori DAN di
+        // setiap transaksi yang memakainya (transaksi menyimpan nama
+        // kategori sebagai teks). UPDATE OR IGNORE + DELETE menangani
+        // pengguna yang kebetulan sudah membuat kategori dengan nama
+        // baru itu sendiri: barisnya digabung, bukan bentrok UNIQUE.
+        for (final (String lamaNama, String type, String baru)
+            in gantiNamaKategoriLama) {
+          await txn.rawUpdate(
+            'UPDATE OR IGNORE kategori SET nama = ? WHERE nama = ? AND type = ?',
+            [baru, lamaNama, type],
+          );
+          await txn.delete(
+            'kategori',
+            where: 'nama = ? AND type = ?',
+            whereArgs: [lamaNama, type],
+          );
+          await txn.update(
+            'transaksi',
+            {'kategori': baru},
+            where: 'kategori = ? AND type = ?',
+            whereArgs: [lamaNama, type],
+          );
+        }
+
+        await _pastikanAkunBawaan(txn);
+
+        for (final (String nama, String type, KelompokAkun kelompok)
+            in kelompokKategoriLama) {
+          await txn.update(
+            'kategori',
+            {'kelompok': kelompok.kode},
+            where: 'nama = ? AND type = ?',
+            whereArgs: [nama, type],
+          );
+        }
+
+        // Sisa kategori buatan pengguna diberi kelompok bawaan per jenis.
+        for (final String type in ['masuk', 'keluar']) {
+          await txn.update(
+            'kategori',
+            {
+              'kelompok':
+                  KelompokAkun.bawaanUntuk(masuk: type == 'masuk').kode,
+            },
+            where: "kelompok = '' AND type = ?",
+            whereArgs: [type],
+          );
+        }
+      });
+    }
+
+    if (lama < 4) { // Versi 4: akun baru 6-108 Konsumsi
+      await db.transaction(_pastikanAkunBawaan);
+    }
+  }
+
+  /// Memastikan semua akun bawaan ada, lalu mengisi kode & kelompoknya.
+  /// Aman dijalankan berulang; dipakai setiap kali bagan akun bertambah.
+  /// Kategori buatan pengguna yang kebetulan bernama sama dengan akun
+  /// baru ikut diberi kode & kelompok akun itu.
+  Future<void> _pastikanAkunBawaan(DatabaseExecutor txn) async {
+    for (final AkunBawaan a in akunBawaan) {
+      await txn.insert(
+        'kategori',
+        {'nama': a.nama, 'type': a.type},
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+      await txn.update(
+        'kategori',
+        {'kode': a.kode, 'kelompok': a.kelompok.kode},
+        where: 'nama = ? AND type = ?',
+        whereArgs: [a.nama, a.type],
+      );
     }
   }
 

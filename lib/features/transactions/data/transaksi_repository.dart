@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart'; // Import driver database SQLite
 
+import '../../../core/akuntansi/coa.dart'; // Kelompok akun COA untuk kategori baru
 import '../../../core/database/database_helper.dart'; // Helper untuk membuka koneksi database aplikasi
 import '../../../core/utils/ulid.dart'; // Fungsi bantu membuat id unik (ULID) untuk transaksi baru
 import 'transaction_model.dart'; // Model data transaksi & ringkasan keuangan
@@ -265,7 +266,16 @@ class TransaksiRepository { // Kelas satu-satunya jalur akses ke tabel transaksi
     final Database db = await _db; // Buka/tunggu koneksi database
     await db.insert( // Sisipkan kategori baru ke tabel
       'kategori', // Nama tabel kategori
-      {'nama': bersih, 'type': type.name}, // Data yang disisipkan: nama bersih dan jenis transaksi
+      {
+        'nama': bersih,
+        'type': type.name,
+        // Kategori buatan pengguna (atau tebakan AI) belum punya kode
+        // akun; kelompoknya ditebak dari jenis supaya tetap masuk ke
+        // bagian laporan laba rugi yang wajar.
+        'kelompok': KelompokAkun.bawaanUntuk(
+          masuk: type == TransactionType.masuk,
+        ).kode,
+      }, // Data yang disisipkan: nama bersih, jenis, dan kelompok akun
       conflictAlgorithm: ConflictAlgorithm.ignore, // Abaikan diam-diam jika kategori dengan nama+jenis sama sudah ada
     );
   }

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart'; // Import komponen UI utama Flutter
 import '../../../../core/services/aksesibilitas_controller.dart'; // Pola getaran berhasil/gagal
 import '../../../../core/theme/app_colors.dart'; // Palet warna dasar aplikasi
 import '../../../../core/theme/theme_extensions.dart'; // Ekstensi context untuk warna tema
+import '../../../../core/utils/accessibility_helper.dart'; // Membacakan pesan validasi lewat screen reader
 import '../../../../core/services/profile_update_service.dart'; // Service notifikasi perubahan profil ke halaman lain
+import '../../data/validasi_profil.dart'; // Aturan isian wajib & format
 import '../../data/profile_repository.dart'; // Sumber data profil pengguna (baca/simpan)
 
 /// ─────────────────────────────────────────────────────────────────
@@ -34,6 +36,10 @@ class _InformasiProfilPageState extends State<InformasiProfilPage> { // Kelas St
   final Map<TextEditingController, FocusNode> _focusNodes = {};
   FocusNode _focusUntuk(TextEditingController c) =>
       _focusNodes.putIfAbsent(c, FocusNode.new); // Ambil atau buat FocusNode milik controller ini
+
+  /// Pesan galat per field setelah tombol Simpan ditekan. Kosong
+  /// berarti semua isian valid.
+  final Map<TextEditingController, String> _galat = {};
 
   final _repo = ProfileRepository.instance; // Objek singleton untuk membaca/menyimpan data profil
 
@@ -73,7 +79,45 @@ class _InformasiProfilPageState extends State<InformasiProfilPage> { // Kelas St
   }
 
   // ── Simpan ke DB ─────────────────────────────────────────────────
+  /// Isian yang wajib & formatnya. Alamat boleh kosong.
+  Map<TextEditingController, (String, String? Function(String))> get _aturan => {
+        _namaCtrl: ('Nama Lengkap', validasiWajib),
+        _emailCtrl: ('Email', validasiEmail),
+        _noHpCtrl: ('Nomor HP', validasiNoHp),
+        _namaUsahaCtrl: ('Nama Usaha', validasiWajib),
+        _jenisUsahaCtrl: ('Jenis Usaha', validasiWajib),
+      };
+
+  /// Memeriksa semua isian. Bila ada yang salah, pengguna diberi tahu
+  /// lewat teks merah di bawah field, getaran gagal, DAN pengumuman
+  /// suara yang menyebut semua field bermasalah sekaligus — lalu fokus
+  /// dipindah ke field pertama yang salah.
+  bool _validasi() {
+    _galat.clear();
+    final List<String> pesan = [];
+    TextEditingController? pertama;
+    _aturan.forEach((ctrl, aturan) {
+      final String? galat = aturan.$2(ctrl.text.trim());
+      if (galat != null) {
+        _galat[ctrl] = galat;
+        pesan.add('${aturan.$1} $galat');
+        pertama ??= ctrl;
+      }
+    });
+    setState(() {});
+    if (pertama == null) return true;
+
+    AksesibilitasController.instance.getarGagal(); // Pola gagal: 2 getaran pendek
+    AccessibilityHelper.announce(
+      context,
+      'Profil belum bisa disimpan. ${pesan.join('. ')}.',
+    );
+    _focusUntuk(pertama!).requestFocus();
+    return false;
+  }
+
   Future<void> _simpan() async { // Menyimpan perubahan form ke database
+    if (!_validasi()) return; // Jangan simpan bila ada isian wajib yang kosong/salah
     setState(() => _isSaving = true); // Tampilkan status sedang menyimpan
     try { // Coba proses penyimpanan, tangkap jika gagal
       await _repo.simpanInfoPribadi( // Kirim seluruh data form ke repository untuk disimpan
@@ -324,7 +368,13 @@ class _InformasiProfilPageState extends State<InformasiProfilPage> { // Kelas St
                         crossAxisAlignment: CrossAxisAlignment.start, // Rata kiri
                         children: [
                           Text( // Label kecil di atas nilai field
-                            field.label, // Nama field, misal "Nama Lengkap"
+                            // Tanda bintang terlihat, kata "wajib" terdengar.
+                            _aturan.containsKey(field.controller)
+                                ? '${field.label} *'
+                                : field.label,
+                            semanticsLabel: _aturan.containsKey(field.controller)
+                                ? '${field.label}, wajib diisi'
+                                : field.label,
                             style: TextStyle(
                               fontSize: 13,
                               color: context.warnaTeksMuted, // Warna redup untuk label
@@ -359,10 +409,31 @@ class _InformasiProfilPageState extends State<InformasiProfilPage> { // Kelas St
                                       borderSide: BorderSide(
                                           color: context.warnaGarisInput),
                                     ),
+                                    // Galat tampil di bawah field dan ikut dibacakan
+                                    // TalkBack karena berada di MergeSemantics yang sama.
+                                    errorText: _galat[field.controller],
+                                    errorMaxLines: 2,
+                                    errorStyle: TextStyle(
+                                      fontSize: 13,
+                                      color: context.warnaKeluar,
+                                    ),
+                                    errorBorder: UnderlineInputBorder(
+                                      borderSide: BorderSide(color: context.warnaKeluar, width: 1.5),
+                                    ),
+                                    focusedErrorBorder: UnderlineInputBorder(
+                                      borderSide: BorderSide(color: context.warnaKeluar, width: 2),
+                                    ),
                                   ),
+                                  onChanged: (_) {
+                                    if (_galat.remove(field.controller) != null) {
+                                      setState(() {}); // Hapus pesan galat begitu pengguna mulai memperbaiki
+                                    }
+                                  },
                                 )
                               : Text( // Mode lihat: tampilkan teks nilai saja, tidak bisa diedit
-                                  field.controller.text, // Nilai tersimpan saat ini pada controller
+                                  field.controller.text.isEmpty
+                                      ? 'Belum diisi'
+                                      : field.controller.text, // Nilai tersimpan saat ini pada controller
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w500,
@@ -404,4 +475,3 @@ class _FieldItem { // Kelas data sederhana untuk menampung konfigurasi satu fiel
     this.keyboardType = TextInputType.text, // Default keyboard teks biasa jika tidak ditentukan
   });
 }
-

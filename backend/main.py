@@ -57,19 +57,18 @@ Dari teks yang diberikan, tentukan:
 - jenis: "masuk" (pemasukan) atau "keluar" (beban/pengeluaran), menurut
   KRITERIA JENIS di bawah. null hanya jika arahnya benar-benar tidak
   bisa ditentukan.
-- kategori: cari kategori yang paling cocok dari daftar kategori untuk
-  jenis yang kamu tentukan di atas (kategori_masuk jika jenis masuk,
-  kategori_keluar jika jenis keluar), dengan bantuan PANDUAN KATEGORI di
-  bawah. Jika salah satu kategori di daftar cocok, walaupun hanya secara
-  umum, PILIH PERSIS nama itu apa adanya (jangan ubah ejaan/
-  kapitalisasinya). Buat kategori baru HANYA jika tidak ada satu pun
-  kategori di daftar yang cocok, tapi ucapan cukup jelas menyebutkan
-  jenis barang/aktivitasnya (mis. "bayar pajak", "jual kerajinan
-  tangan"): beri nama singkat (satu sampai tiga kata, format judul, mis.
-  "Pajak", "Kerajinan Tangan") — kategori baru ini akan otomatis
-  ditambahkan ke daftar kategori pengguna. null hanya jika jenis
-  transaksinya sendiri tidak jelas, atau ucapan sama sekali tidak
-  memberi info soal kategori apa pun.
+- kategori: kategori adalah AKUN dalam bagan akun (COA) laporan laba
+  rugi SAK EMKM. Pilih akun yang paling cocok dari daftar untuk jenis
+  yang kamu tentukan di atas (kategori_masuk jika jenis masuk,
+  kategori_keluar jika jenis keluar), dengan bantuan PANDUAN AKUN di
+  bawah, dan tulis PERSIS nama itu apa adanya (jangan ubah ejaan/
+  kapitalisasinya). JANGAN membuat nama kategori baru bila daftar
+  memuat akun penampung ("Beban Usaha Lain-lain" untuk keluar,
+  "Pendapatan Lain-lain" untuk masuk): pakai penampung itu bila tidak
+  ada akun lain yang cocok. Hanya bila daftar tidak memuat penampung
+  tersebut, boleh buat nama baru yang singkat (satu sampai tiga kata,
+  format judul). null hanya jika jenis transaksinya sendiri tidak
+  jelas, atau ucapan sama sekali tidak memberi info soal kategori.
 - metode: "tunai" jika ucapan menyebut uang tunai/cash/kontan, atau
   "non tunai" jika menyebut transfer, QRIS, kartu debit/kredit, e-wallet
   (mis. OVO, GoPay, Dana), atau metode nontunai lain. null jika metode
@@ -103,31 +102,75 @@ Tentukan dari arah uangnya, dilihat dari sisi pengguna (usaha/organisasi):
 - Jika tidak ada kata kerja dan barangnya bisa dibeli maupun dijual
   (mis. "kerupuk lima belas ribu"), jenis = null supaya pengguna ditanya.
 
-PANDUAN KATEGORI
-Hanya berlaku bila nama kategori itu ADA di daftar yang diberikan.
-Kategori keluar (beban):
-- Bahan Baku: bahan yang diolah atau barang dagangan yang dijual lagi
-  (tepung, gula, minyak, sayur, daging, telur, bumbu, kain, stok,
-  kulakan, bayar ke pemasok/supplier), termasuk kemasan (plastik,
-  kardus, stiker, selotip, gelas plastik).
-- Transportasi: bensin, solar, parkir, tol, ongkir, ojek/gojek/grab,
-  angkot, servis atau ganti oli kendaraan.
-- Gaji: gaji, upah, honor, THR, bonus, lembur, bayar tukang/pekerja.
+PANDUAN AKUN (SAK EMKM)
+ATURAN SIAPA PENERIMA MANFAAT: tentukan untuk siapa uang itu dipakai.
+- Untuk karyawan, pekerja, tamu, atau kegiatan usaha -> akun beban usaha
+  yang sesuai (mis. makan karyawan -> Konsumsi).
+- Untuk pemilik pribadi atau keluarganya -> Prive, walaupun barangnya
+  sama (mis. "owner beli makan" -> Prive). Bila pemilik membeli
+  barang UNTUK USAHA (mis. "owner beli tepung"), tetap akun usaha.
+- Yang berbicara di aplikasi ini adalah PEMILIK usaha. Jadi "saya"/
+  "aku"/"gue" yang makan, minum, atau memakai sesuatu untuk dirinya
+  sendiri (mis. "saya beli makan siang", "aku ngopi") -> Prive.
+  Tetapi "saya beli tepung/plastik/bensin antar pesanan" tetap akun
+  usaha, karena barangnya untuk usaha.
+- Bila tidak disebut siapa pun (mis. "beli makan dua puluh ribu",
+  tanpa "saya"), anggap untuk usaha -> Konsumsi.
+
+Hanya berlaku bila nama akun itu ADA di daftar. Bila daftar masih
+memakai nama lama (mis. "Bahan Baku", "Gaji", "Transportasi"), terapkan
+panduan yang sama ke nama padanannya.
+Akun keluar:
+- Bahan Baku dan Barang Dagang (harga pokok): bahan yang diolah atau
+  barang yang dijual lagi (tepung, gula, minyak, sayur, daging, telur,
+  bumbu, kain, stok, kulakan, bayar ke pemasok/supplier).
+- Kemasan (harga pokok): plastik, kardus, stiker label, selotip, gelas
+  atau wadah plastik untuk produk.
+- Gaji dan Upah: gaji, upah, honor, THR, bonus, lembur, bayar tukang
+  atau pekerja.
 - Sewa: kontrakan, sewa kios/lapak/tempat, sewa alat, tenda, sound.
-- Listrik dan Air: listrik, token/PLN, air, PDAM.
-- Peralatan: membeli, mencicil, atau memperbaiki alat kerja (kompor,
-  blender, etalase, timbangan, mesin, kulkas).
-- Kegiatan: biaya acara, rapat, atau kegiatan organisasi (konsumsi,
-  dekorasi, hadiah lomba, spanduk acara).
-- Pengeluaran Lain: hanya bila tidak ada kategori lain yang cocok DAN
-  aktivitasnya terlalu umum untuk dibuatkan kategori baru.
-Kategori masuk:
+- Listrik, Air, dan Komunikasi: listrik, token/PLN, air, PDAM, gas
+  untuk usaha, pulsa, paket data, internet, wifi.
+- Transportasi dan Pengiriman: biaya BERPINDAH atau MENGIRIM: bensin,
+  solar, parkir, tol, ongkir, ojek/gojek/grab, angkot, tiket. Servis
+  atau perbaikan kendaraan BUKAN akun ini.
+- Pemeliharaan dan Perbaikan: servis, perbaikan, perawatan, suku cadang
+  untuk aset yang SUDAH dimiliki: servis/ganti oli/ban/tambal
+  kendaraan, servis kulkas/mesin/kompor, perbaikan atap/bangunan, cat.
+- Perlengkapan: barang habis pakai atau alat kecil yang murah (sapu,
+  lap, pisau, alat tulis, sabun, baterai, sendok).
+- Pemasaran: iklan, promosi, brosur, spanduk, endorse, diskon promosi.
+- Konsumsi: makan, minum, snack, kopi, atau nasi kotak untuk KARYAWAN,
+  pekerja, tukang, tamu usaha, atau rapat usaha (mis. "beli makan buat
+  karyawan", "kopi untuk tamu", "nasi kotak rapat"). BUKAN Gaji dan
+  Upah — gaji adalah bayaran uang, konsumsi adalah makanan/minuman.
+- Bunga dan Biaya Bank: bunga pinjaman, biaya admin bank, biaya
+  transfer, potongan e-wallet.
+- Pajak: pajak penghasilan, PPh final UMKM, pajak usaha.
+- Pembelian Aset Tetap (di luar laba rugi): MEMBELI barang tahan lama
+  yang mahal untuk usaha (motor, mobil, mesin, etalase, kulkas, freezer,
+  kompor besar, laptop, bangunan).
+- Angsuran Pinjaman (di luar laba rugi): bayar cicilan atau melunasi
+  pinjaman/utang (KUR, koperasi, bank).
+- Prive (di luar laba rugi): uang usaha dipakai untuk keperluan
+  PRIBADI pemilik atau keluarganya, bukan untuk usaha. Contoh: owner/
+  pemilik/bos/"saya" beli makan atau minum untuk dirinya sendiri, makan
+  keluarga, belanja dapur rumah, uang sekolah anak, pulsa atau bensin
+  pribadi, ambil uang untuk dipakai sendiri.
+- Beban Usaha Lain-lain: biaya usaha yang tidak cocok dengan akun mana
+  pun di atas.
+Akun masuk:
 - Penjualan: hasil menjual barang/produk, termasuk pembeli yang bayar
   atau transferan dari pelanggan.
-- Jasa: bayaran atas jasa atau tenaga (jahit, servis, potong rambut).
-- Iuran Anggota: iuran/kas dari anggota.
-- Donasi: sumbangan atau donasi yang diterima.
-- Modal Masuk: tambahan modal atau pinjaman yang diterima.
+- Pendapatan Jasa: bayaran atas jasa atau tenaga (jahit, servis, potong
+  rambut, ongkos kirim yang dibayar pelanggan).
+- Pendapatan Lain-lain: uang masuk di luar usaha utama (bunga tabungan,
+  hadiah, sumbangan diterima, menyewakan barang, jual barang bekas
+  milik usaha).
+- Modal Pemilik (di luar laba rugi): pemilik menambah/menyetor modal
+  dari uang pribadi.
+- Pinjaman Diterima (di luar laba rugi): menerima pinjaman/utang (KUR,
+  koperasi, bank, teman). Pinjaman BUKAN pendapatan.
 
 Balas HANYA JSON sesuai skema, tanpa penjelasan tambahan."""
 
@@ -373,6 +416,10 @@ async def analisis_laporan(req: AnalisisRequest) -> AnalisisResponse:
     return AnalisisResponse(judul=judul, saran=saran, nada=nada)
 
 
+
 @app.get("/health")
 async def health() -> dict[str, bool]:
-    return {"ok": True, "key_configured": bool(GEMINI_API_KEY)}
+    return {
+        "ok": True,
+        "key_configured": bool(GEMINI_API_KEY),
+    }

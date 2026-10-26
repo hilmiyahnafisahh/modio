@@ -1,0 +1,4 @@
+# Beberapa test (coa_laba_rugi, analisis_ai_*) memakai berkas SQLite yang
+# sama lewat DatabaseHelper; dijalankan paralel, mereka saling menghapus
+# basis data satu sama lain. Jalankan file test satu per satu.
+concurrency: 1
