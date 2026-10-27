@@ -275,7 +275,11 @@ class _ReportsPageState extends State<ReportsPage> { // kelas state untuk Report
         const SizedBox(height: 20), // jarak vertikal
 
         // ── Asisten Keuangan ─────────────────────────────────
-        _AsistenKeuanganSection(), // bagian ajakan pakai asisten AI
+        _AsistenKeuanganSection( // bagian ajakan pakai asisten AI
+          tahun: _tahun,
+          bulan: _bulan,
+          repo: _repo,
+        ), 
       ],
     );
   }
@@ -849,15 +853,64 @@ class _KategoriRincianTileState extends State<_KategoriRincianTile> {
 // ─────────────────────────────────────────────────────────────────────────────
 // ignore: unused_element
 class _AsistenKeuanganSection extends StatelessWidget { // bagian ajakan pakai asisten AI
-  const _AsistenKeuanganSection();
+  const _AsistenKeuanganSection({
+    required this.tahun,
+    required this.bulan,
+    required this.repo,
+  });
+
+  final int tahun;
+  final int bulan;
+  final LaporanRepository repo;
 
   @override
   Widget build(BuildContext context) {
     return AiAssistantBanner( // banner ajakan analisis/chat dengan AI
-      onAnalysisTap: () => Navigator.push( // buka halaman asisten AI saat "Analisis" ditekan
-        context,
-        buatRute((_) => const AiAssistantPage()),
-      ),
+      onAnalysisTap: () async { 
+        // 1. Tampilkan dialog loading saat menyiapkan data laporan untuk AI
+        showDialog(
+          context: context,
+          barrierDismissible: false, // dialog tidak bisa ditutup dengan ketuk di luar
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(), // tampilkan indikator loading
+          ),
+        ); 
+        
+        // 2. Panggil fungsi analisis laba rugi dari repository
+        final String hasilAnalisis = await repo.analisisLaporanDenganGemini(
+          tahun: tahun,
+          bulan: bulan,
+        );
+
+        // 3. Tutup dialog loading
+        if (context.mounted) Navigator.pop(context);
+
+        // 4. Tampilkan hasil analisis dari Gemini dalam kotak dialog popup
+        if (context.mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text('Analisis Keuangan AI'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Text(
+                    hasilAnalisis,
+                    style: const TextStyle(fontSize: 14, height: 1.5),
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Tutup'),
+                ),
+              ],
+            ),
+          );
+        }
+      },
       onChatTap: () => Navigator.push( // buka halaman asisten AI saat "Chat" ditekan
         context,
         buatRute((_) => const AiAssistantPage()),
@@ -865,7 +918,7 @@ class _AsistenKeuanganSection extends StatelessWidget { // bagian ajakan pakai a
     );
   }
 }
-
+      
 // ─────────────────────────────────────────────────────────────────────────────
 // Dialog Pilih Bulan
 // ─────────────────────────────────────────────────────────────────────────────

@@ -151,6 +151,138 @@ async def parse_transaction(req: ParseTransaksiRequest) -> ParseTransaksiRespons
     )
 
 
+class RincianKategori(BaseModel):
+    nama: str
+    total: int
+    jumlah_transaksi: int
+    persen: int  # porsi terhadap total jenisnya, dihitung di app
+
+
+class AnalisisLaporanRequest(BaseModel):
+    periode: str  # mis. "Januari 2026"
+    total_pendapatan: int
+    total_beban: int
+    laba_bersih: int
+    jumlah_transaksi: int
+    perubahan_pendapatan: int | None  # persen vs bulan lalu, null jika tak ada pembanding
+    perubahan_beban: int | None
+    rincian_pendapatan: list[RincianKategori]
+    rincian_beban: list[RincianKategori]
+
+
+class AnalisisLaporanResponse(BaseModel):
+    analisis: str
+
+
+ANALISIS_PROMPT = """Kamu asisten keuangan untuk pemilik usaha kecil (UMKM)
+Indonesia yang memakai aplikasi Modio. Sebagian pengguna adalah tunanetra
+dan mendengarkan jawabanmu lewat pembaca layar.
+
+Dari laporan laba rugi satu bulan yang diberikan, tulis analisis singkat
+dalam tiga bagian, masing-masing diawali judul pada barisnya sendiri:
+Evaluasi laba rugi:
+Perencanaan ke depan:
+Penilaian kondisi usaha:
+
+Aturan wajib:
+- Semua angka sudah dihitung oleh aplikasi. JANGAN menghitung, menjumlah,
+  membulatkan, atau mengarang angka baru. Jika menyebut angka, salin
+  persis dari data. Lebih baik tidak menyebut angka daripada salah.
+- Teks polos saja. Tanpa Markdown: tanpa tanda bintang, pagar, garis
+  bawah, atau tabel. Daftar boleh memakai tanda hubung di awal baris.
+- Bahasa Indonesia sederhana, ramah, dan praktis. Tanpa istilah akuntansi
+  yang rumit. Saran harus konkret dan bisa dilakukan usaha kecil.
+- Maksimal sekitar 200 kata secara keseluruhan."""
+
+
+def _rupiah(n: int) -> str:
+    tanda = "minus " if n < 0 else ""
+    return f"{tanda}Rp {abs(n):,}".replace(",", ".")
+
+
+def _baris_rincian(rincian: list[RincianKategori]) -> str:
+    if not rincian:
+        return "- (tidak ada)"
+    return "\n".join(
+        f"- {r.nama}: {_rupiah(r.total)}, {r.jumlah_transaksi} transaksi, "
+        f"{r.persen} persen"
+        for r in rincian
+    )
+
+
+def _baris_perubahan(label: str, persen: int | None) -> str:
+    if persen is None:
+        return f"{label} dibanding bulan lalu: tidak ada data pembanding"
+    arah = "naik" if persen >= 0 else "turun"
+    return f"{label} dibanding bulan lalu: {arah} {abs(persen)} persen"
+
+
+@app.post("/v1/ai/analyze-report", response_model=AnalisisLaporanResponse)
+async def analyze_report(req: AnalisisLaporanRequest) -> AnalisisLaporanResponse:
+    if not GEMINI_API_KEY:
+        raise HTTPException(
+            status_code=500,
+            detail="GEMINI_API_KEY belum diisi di backend/.env",
+        )
+
+    user_prompt = (
+        f"Periode: {req.periode}\n"
+        f"Total pendapatan: {_rupiah(req.total_pendapatan)}\n"
+        f"Total beban biaya: {_rupiah(req.total_beban)}\n"
+        f"Laba bersih: {_rupiah(req.laba_bersih)}\n"
+        f"Jumlah transaksi: {req.jumlah_transaksi}\n"
+        f"{_baris_perubahan('Pendapatan', req.perubahan_pendapatan)}\n"
+        f"{_baris_perubahan('Beban biaya', req.perubahan_beban)}\n"
+        f"Rincian pendapatan per kategori:\n"
+        f"{_baris_rincian(req.rincian_pendapatan)}\n"
+        f"Rincian beban biaya per kategori:\n"
+        f"{_baris_rincian(req.rincian_beban)}"
+    )
+
+    body = {
+        "system_instruction": {"parts": [{"text": ANALISIS_PROMPT}]},
+        "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
+    }
+
+    # Sedikit di bawah batas tunggu app (20 detik), supaya app menerima
+    # pesan galat yang jelas dari sini, bukan sekadar timeout.
+    async with httpx.AsyncClient(timeout=18.0) as client:
+        try:
+            resp = await client.post(
+                GEMINI_URL,
+                headers={
+                    "x-goog-api-key": GEMINI_API_KEY,
+                    "Content-Type": "application/json",
+                },
+                json=body,
+            )
+        except httpx.RequestError as e:
+            raise HTTPException(
+                status_code=502, detail=f"Gagal menghubungi Gemini: {e}"
+            )
+
+    if resp.status_code != 200:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Gemini error {resp.status_code}: {resp.text}",
+        )
+
+    data = resp.json()
+    try:
+        teks = data["candidates"][0]["content"]["parts"][0]["text"]
+    except (KeyError, IndexError) as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Format balasan Gemini tidak terduga: {e}",
+        )
+
+    # Jaga-jaga bila model tetap memakai Markdown: pembaca layar akan
+    # membacakan tanda bintang dan pagar satu per satu.
+    teks = teks.replace("**", "").replace("#", "").strip()
+
+    return AnalisisLaporanResponse(analisis=teks)
+
+
 @app.get("/health")
 async def health() -> dict[str, bool]:
     return {"ok": True, "key_configured": bool(GEMINI_API_KEY)}
