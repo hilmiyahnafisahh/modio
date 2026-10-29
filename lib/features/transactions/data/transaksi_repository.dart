@@ -5,7 +5,7 @@ import '../../../core/utils/ulid.dart'; // Fungsi bantu membuat id unik (ULID) u
 import 'transaction_model.dart'; // Model data transaksi & ringkasan keuangan
 
 /// Rentang waktu untuk menyaring riwayat
-enum PeriodeFilter { semua, hariIni, mingguIni, bulanIni } // Pilihan rentang waktu: semua, hari ini, minggu ini, bulan ini
+enum PeriodeFilter { semua, hariIni, mingguIni, bulanIni, tahunIni } // Pilihan rentang waktu: semua, hari ini, minggu ini, bulan ini, tahun ini
 
 extension PeriodeFilterX on PeriodeFilter { // Tambahan fungsi/getter untuk enum PeriodeFilter
   String get label => switch (this) { // Teks label yang bisa ditampilkan ke pengguna untuk tiap pilihan
@@ -13,6 +13,7 @@ extension PeriodeFilterX on PeriodeFilter { // Tambahan fungsi/getter untuk enum
         PeriodeFilter.hariIni => 'Hari ini', // Label untuk filter hari ini
         PeriodeFilter.mingguIni => 'Minggu ini', // Label untuk filter minggu ini
         PeriodeFilter.bulanIni => 'Bulan ini', // Label untuk filter bulan ini
+        PeriodeFilter.tahunIni => 'Tahun ini', // Label untuk filter tahun ini
       };
 
   /// Batas awal periode dalam waktu setempat. null berarti tanpa batas.
@@ -24,6 +25,7 @@ extension PeriodeFilterX on PeriodeFilter { // Tambahan fungsi/getter untuk enum
       PeriodeFilter.mingguIni => DateTime(now.year, now.month, now.day) // Mulai dari awal hari ini
           .subtract(Duration(days: now.weekday - 1)), // Mundur ke hari Senin minggu ini
       PeriodeFilter.bulanIni => DateTime(now.year, now.month, 1), // Tanggal 1 bulan berjalan
+      PeriodeFilter.tahunIni => DateTime(now.year), // 1 Januari tahun berjalan
     };
   }
 }
@@ -103,6 +105,7 @@ class TransaksiRepository { // Kelas satu-satunya jalur akses ke tabel transaksi
     String? sebelumId, // Untuk paginasi: hanya ambil transaksi dengan id lebih kecil dari ini
     PeriodeFilter periode = PeriodeFilter.semua, // Filter rentang waktu, default semua waktu
     DateTime? tanggalKhusus, // Filter ke satu tanggal spesifik, mengabaikan periode jika diisi
+    DateTime? bulanKhusus, // Filter ke satu bulan kalender (tahun & bulan dari nilai ini), mengabaikan periode jika diisi
     TransactionType? type, // Filter jenis transaksi, null berarti semua jenis
     String? cari, // Kata kunci pencarian pada judul/kategori
   }) async {
@@ -128,7 +131,13 @@ class TransaksiRepository { // Kelas satu-satunya jalur akses ke tabel transaksi
       syarat.add('occurred_at >= ? AND occurred_at < ?'); // Syarat: waktu kejadian di antara awal dan akhir hari itu
       nilai.add(awal.toUtc().toIso8601String()); // Batas awal dalam format UTC
       nilai.add(akhir.toUtc().toIso8601String()); // Batas akhir dalam format UTC
-    } else { // Jika tidak ada tanggal khusus, pakai filter periode biasa
+    } else if (bulanKhusus != null) { // Jika ada filter satu bulan kalender
+      final DateTime awal = DateTime(bulanKhusus.year, bulanKhusus.month); // Tanggal 1 bulan itu pukul 00:00
+      final DateTime akhir = DateTime(bulanKhusus.year, bulanKhusus.month + 1); // Tanggal 1 bulan berikutnya
+      syarat.add('occurred_at >= ? AND occurred_at < ?'); // Syarat: waktu kejadian di dalam bulan itu
+      nilai.add(awal.toUtc().toIso8601String()); // Batas awal dalam format UTC
+      nilai.add(akhir.toUtc().toIso8601String()); // Batas akhir dalam format UTC
+    } else { // Jika tidak ada tanggal/bulan khusus, pakai filter periode biasa
       final DateTime? mulai = periode.mulai; // Ambil tanggal awal periode dari enum filter
       if (mulai != null) { // Jika periode punya batas awal (bukan "semua waktu")
         syarat.add('occurred_at >= ?'); // Syarat: waktu kejadian setelah atau sama dengan batas awal

@@ -209,13 +209,16 @@ class _PengaturanAksesibilitasPageState
   }
 
   Widget _buildSectionLabel(String label) { // Membangun label judul seksi kecil
-    return Text(
-      label,
-      style: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-        color: context.warnaTeksMuted,
-        letterSpacing: 0.8, // Jarak antar huruf sedikit lebar (gaya label)
+    return Semantics( // Tandai sebagai judul agar bisa dilompati lewat navigasi Judul TalkBack
+      header: true,
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: context.warnaTeksMuted,
+          letterSpacing: 0.8, // Jarak antar huruf sedikit lebar (gaya label)
+        ),
       ),
     );
   }

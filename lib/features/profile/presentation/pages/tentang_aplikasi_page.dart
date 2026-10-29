@@ -126,8 +126,8 @@ class TentangAplikasiPage extends StatelessWidget { // Halaman statis, tidak pun
             _buildSectionLabel(context, 'AKSESIBILITAS & KEPATUHAN'), // Label judul seksi kepatuhan
             const SizedBox(height: 8),
             _buildInfoGroup(context, [ // Kartu berisi info standar aksesibilitas yang dipenuhi
-              _InfoRow(label: 'Standar',     value: 'WCAG 2.1 Level AAA'),
-              _InfoRow(label: 'Kontras Min', value: '7.0:1 (semua elemen teks)'),
+              _InfoRow(label: 'Standar',     value: 'WCAG 2.1 Level AA'),
+              _InfoRow(label: 'Kontras Min', value: '7.0:1 (teks, setara AAA)'),
               _InfoRow(label: 'Target Tap',  value: '≥ 44 × 44 dp'),
               _InfoRow(label: 'Dukungan',    value: 'TalkBack & VoiceOver'),
             ]),
@@ -180,13 +180,16 @@ class TentangAplikasiPage extends StatelessWidget { // Halaman statis, tidak pun
   Widget _buildSectionLabel(BuildContext context, String label) { // Membangun label judul seksi kecil
     return Align(
       alignment: Alignment.centerLeft, // Rata kiri meskipun induk Column rata tengah
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: context.warnaTeksMuted,
-          letterSpacing: 0.8, // Jarak antar huruf sedikit lebar (gaya label)
+      child: Semantics( // Tandai sebagai judul agar bisa dilompati lewat navigasi Judul TalkBack
+        header: true,
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: context.warnaTeksMuted,
+            letterSpacing: 0.8, // Jarak antar huruf sedikit lebar (gaya label)
+          ),
         ),
       ),
     );

@@ -55,6 +55,17 @@ class _ProfilePageState extends State<ProfilePage> {
     _muatProfil(); // muat data profil segera setelah widget dibuat
   }
 
+  /// Buka Informasi Profil dari ikon edit di samping nama, lalu muat
+  /// ulang nama sesudah kembali. Menggantikan baris menu "Informasi
+  /// Profil" di daftar PENGATURAN, supaya daftarnya lebih pendek.
+  Future<void> _bukaInformasiProfil() async {
+    await Navigator.push(
+      context,
+      buatRute((_) => const InformasiProfilPage()), // buka halaman informasi profil
+    );
+    _muatProfil(); // nama/jabatan bisa saja baru diubah
+  }
+
   Future<void> _muatProfil() async {
     final nama    = await _repo.bacaNama(); // ambil nama dari penyimpanan
     final jabatan = await _repo.bacaJabatan(); // ambil jabatan dari penyimpanan
@@ -98,7 +109,7 @@ class _ProfilePageState extends State<ProfilePage> {
   static Color _bahaya(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark
           ? AppColors.darkExpense // warna peringatan/bahaya mode gelap
-          : AppColors.tertiary500; // warna peringatan/bahaya mode terang
+          : AppColors.tertiary700; // warna bahaya mode terang; tertiary500 hanya 3,8:1, gagal AA untuk teks "Keluar"
 
   @override
   Widget build(BuildContext context) {
@@ -152,19 +163,37 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Text(
-                      // "Memuat..." hanya selagi benar-benar membaca
-                      // dari basis data. Sesudah itu, kosong berarti
-                      // profil memang belum diisi — tampilkan sapaan
-                      // polos, bukan nama contoh milik orang lain.
-                      _sedangMemuat
-                          ? 'Memuat...'
-                          : (_nama.isEmpty ? 'Selamat datang' : _nama),
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: _teksUtama(context),
-                      ),
+                    // Nama + ikon edit. Ikon dibuat seimbang dengan
+                    // ruang kosong selebar sama di kiri, supaya nama
+                    // tetap berada di tengah.
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const SizedBox(width: 48), // penyeimbang ikon edit di kanan
+                        Flexible(
+                          child: Text(
+                            // "Memuat..." hanya selagi benar-benar membaca
+                            // dari basis data. Sesudah itu, kosong berarti
+                            // profil memang belum diisi — tampilkan sapaan
+                            // polos, bukan nama contoh milik orang lain.
+                            _sedangMemuat
+                                ? 'Memuat...'
+                                : (_nama.isEmpty ? 'Selamat datang' : _nama),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: _teksUtama(context),
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          constraints: const BoxConstraints(minWidth: 48, minHeight: 48), // target sentuh minimum
+                          onPressed: _bukaInformasiProfil,
+                          tooltip: 'Ubah informasi profil', // label untuk pembaca layar
+                          icon: Icon(Icons.edit_outlined, size: 20, color: scheme.primary),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -234,6 +263,9 @@ class _ProfilePageState extends State<ProfilePage> {
                                 );
                               },
                             ),
+                            // Disembunyikan selama sidik jari masih pengembangan
+                            // (lihat KeamananController.biometrikTersedia).
+                            if (KeamananController.biometrikTersedia) ...[
                             Divider(height: 1, indent: 46, color: _garis(context)),
                             _buildSettingToggle(
                               icon: Icons.fingerprint_outlined,
@@ -250,6 +282,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                 );
                               },
                             ),
+                            ],
                           ],
                         ),
                       ),
@@ -274,13 +307,16 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildSectionLabel(String label) {
-    return Text(
-      label,
-      style: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-        color: _teksMuted(context),
-        letterSpacing: 0.8, // jarak antar huruf lebih lebar untuk gaya label kecil
+    return Semantics( // tandai sebagai judul agar bisa dilompati lewat navigasi Judul TalkBack
+      header: true,
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: _teksMuted(context),
+          letterSpacing: 0.8, // jarak antar huruf lebih lebar untuk gaya label kecil
+        ),
       ),
     );
   }
@@ -432,18 +468,6 @@ class _ProfilePageState extends State<ProfilePage> {
   /// lebur jadi satu.
   List<Widget> _daftarMenu(BuildContext context) {
     final List<_MenuItem> items = [
-      _MenuItem(
-        icon: Icons.person_outline,
-        label: 'Informasi Profil',
-        onTap: () async {
-          await Navigator.push(
-            context,
-            buatRute((_) => const InformasiProfilPage()), // buka halaman informasi profil
-          );
-          // Reload nama setelah kembali
-          _muatProfil();
-        },
-      ),
       _MenuItem(
         icon: Icons.lock_outline,
         label: 'Ganti PIN',

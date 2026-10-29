@@ -51,12 +51,13 @@ class BalanceCard extends StatelessWidget { // Widget tanpa state internal, tamp
     final Color warnaTeksKartu = gelap ? AppColors.darkText : AppColors.white; // Warna teks utama menyesuaikan tema
     // Label & periode: dark mode memakai darkTextMuted (rasio 12,3:1
     // yang sudah terverifikasi terhadap darkSurfaceHi), bukan darkText
-    // yang diberi alpha — mengecilkan alpha tidak pernah diukur
-    // rasionya, jadi tidak bisa diklaim AAA.
+    // yang diberi alpha. Mode terang: putih alpha 0,90 di atas ujung
+    // gradasi paling terang (primary700) = 7,6:1 ✓ AAA. Alpha 0,80
+    // sebelumnya hanya 6,4:1.
     final Color warnaMutedKartu =
-        gelap ? AppColors.darkTextMuted : Colors.white.withValues(alpha: 0.88); // Warna teks label/periode
+        gelap ? AppColors.darkTextMuted : Colors.white.withValues(alpha: 0.92); // Warna teks label/periode, 7,8:1
     final Color warnaMutedKartuLemah =
-        gelap ? AppColors.darkTextMuted : Colors.white.withValues(alpha: 0.80); // Warna teks periode lebih redup
+        gelap ? AppColors.darkTextMuted : Colors.white.withValues(alpha: 0.90); // Warna teks periode lebih redup, 7,6:1
 
     return Semantics( // Bungkus dengan info aksesibilitas untuk screen reader
       // Satu kalimat utuh menggantikan tiga elemen terpisah.

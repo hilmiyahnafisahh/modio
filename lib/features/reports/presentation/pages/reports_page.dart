@@ -3,11 +3,14 @@ import 'package:flutter/semantics.dart'; // untuk mengumumkan info ke pembaca la
 import 'package:flutter/services.dart'; // untuk SystemUiOverlayStyle (warna status bar)
 
 import '../../../../core/navigation/app_route.dart'; // helper buatRute() untuk navigasi antar halaman
+import '../../../../core/widgets/akhir_halaman.dart'; // penanda & getaran saat halaman sampai dasar
+import '../../../../core/widgets/month_picker_dialog.dart'; // dialog pemilih bulan & tahun bersama
 import '../../../../core/theme/app_typography.dart'; // kumpulan gaya teks (font, ukuran) aplikasi
 import '../../../../core/theme/theme_extensions.dart'; // ekstensi warna tema (context.warnaX, context.gelap)
 import '../../../../core/utils/currency_formatter.dart'; // format angka menjadi teks Rupiah
 import '../../data/laporan_repository.dart'; // sumber data laporan keuangan bulanan
 import '../../data/report_model.dart'; // model data LaporanBulanan, RincianKategori, dll
+import '../widgets/ai_analysis_sheet.dart'; // lembar saran AI untuk laporan bulan ini
 import '../../../ai_chat/presentation/pages/ai_assistant_page.dart'; // halaman asisten AI
 import '../../../dashboard/presentation/widgets/ai_assistant_banner.dart'; // banner ajakan asisten AI
 import '../../../dashboard/presentation/widgets/balance_card.dart'; // kartu saldo/laba yang dipakai bareng dashboard
@@ -60,7 +63,7 @@ class _ReportsPageState extends State<ReportsPage> { // kelas state untuk Report
   Future<void> _bukaKalender() async { // buka dialog pemilih bulan/tahun
     final DateTime? result = await showDialog<DateTime>( // tampilkan dialog, tunggu hasilnya
       context: context,
-      builder: (_) => _MonthPickerDialog( // bangun dialog pemilih bulan
+      builder: (_) => MonthPickerDialog( // bangun dialog pemilih bulan
         initialDate: DateTime(_tahun, _bulan), // tanggal awal sesuai periode aktif saat ini
       ),
     );
@@ -102,6 +105,7 @@ class _ReportsPageState extends State<ReportsPage> { // kelas state untuk Report
       body: SafeArea( // hindari area yang terpotong notch/status bar
         child: RefreshIndicator( // gestur tarik ke bawah untuk refresh data
           onRefresh: () async => _muat(), // muat ulang data saat ditarik
+          child: GetarAkhirGulir( // getaran ringan sekali saat halaman sampai dasar
           child: SingleChildScrollView( // izinkan konten digulir
             physics: const AlwaysScrollableScrollPhysics(), // tetap bisa ditarik walau konten pendek
             child: Column( // susun konten secara vertikal
@@ -174,6 +178,7 @@ class _ReportsPageState extends State<ReportsPage> { // kelas state untuk Report
               ],
             ),
           ),
+          ),
         ),
       ),
       ),
@@ -183,10 +188,17 @@ class _ReportsPageState extends State<ReportsPage> { // kelas state untuk Report
   Widget _buildHeader() { // bangun bagian judul halaman
     return Padding(
       padding: const EdgeInsets.fromLTRB(18, 28, 18, 0), // jarak tepi khusus judul
-      child: Text(
-        'Laporan Laba Rugi', // judul halaman
-        style: AppTypography.headingMedium.copyWith(
-          color: context.warnaTeksUtama,
+      child: Semantics( // judul halaman untuk navigasi Judul TalkBack
+        header: true,
+        // Hint dibacakan setelah judul: memberi tahu isi halaman di
+        // awal, supaya pengguna tahu bagian apa saja yang bisa dilompati.
+        hint: 'Berisi laba atau rugi, pendapatan, beban biaya, '
+            'dan asisten keuangan per bulan.',
+        child: Text(
+          'Laporan Laba Rugi', // judul halaman
+          style: AppTypography.headingMedium.copyWith(
+            color: context.warnaTeksUtama,
+          ),
         ),
       ),
     );
@@ -280,6 +292,13 @@ class _ReportsPageState extends State<ReportsPage> { // kelas state untuk Report
           bulan: _bulan,
           repo: _repo,
         ), 
+        _AsistenKeuanganSection(laporan: l), // bagian ajakan pakai asisten AI
+
+        PenandaAkhirHalaman( // dibacakan TalkBack setelah elemen terakhir
+          teks: 'Akhir laporan',
+          labelSemantik: 'Akhir laporan ${l.labelPeriode}. '
+              '${l.untung ? 'Laba' : 'Rugi'} ${CurrencyFormatter.spoken(l.labaBersih.abs())}.',
+        ),
       ],
     );
   }
@@ -612,6 +631,7 @@ class _SeksiKeuangan extends StatelessWidget { // kartu tampilan Pendapatan/Beba
           // yang perlu bisa disembunyikan hanyalah transaksi di dalam
           // tiap kategori, satu per satu.
           Semantics( // info aksesibilitas untuk header kartu
+            header: true, // judul bagian, bisa dilompati lewat navigasi Judul TalkBack
             label: '$judul. Total ${CurrencyFormatter.spoken(total)}. ' // label lengkap yang diucapkan pembaca layar
                 '${rincian.length} kategori.',
             excludeSemantics: true,
@@ -851,7 +871,6 @@ class _KategoriRincianTileState extends State<_KategoriRincianTile> {
 // ─────────────────────────────────────────────────────────────────────────────
 // Bagian Asisten Keuangan  –  pakai AiAssistantBanner yang sama dengan dashboard
 // ─────────────────────────────────────────────────────────────────────────────
-// ignore: unused_element
 class _AsistenKeuanganSection extends StatelessWidget { // bagian ajakan pakai asisten AI
   const _AsistenKeuanganSection({
     required this.tahun,
@@ -862,6 +881,9 @@ class _AsistenKeuanganSection extends StatelessWidget { // bagian ajakan pakai a
   final int tahun;
   final int bulan;
   final LaporanRepository repo;
+  const _AsistenKeuanganSection({required this.laporan});
+
+  final LaporanBulanan laporan; // laporan bulan yang sedang dibuka, untuk dianalisis AI
 
   @override
   Widget build(BuildContext context) {
@@ -911,6 +933,8 @@ class _AsistenKeuanganSection extends StatelessWidget { // bagian ajakan pakai a
           );
         }
       },
+      onAnalysisTap: () => tampilkanAnalisisAi(context, laporan), // minta saran AI untuk bulan ini
+      // Chat masih dummy, jadi tetap membuka halaman asisten.
       onChatTap: () => Navigator.push( // buka halaman asisten AI saat "Chat" ditekan
         context,
         buatRute((_) => const AiAssistantPage()),

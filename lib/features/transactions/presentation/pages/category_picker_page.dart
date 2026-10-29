@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart'; // Widget-widget dasar Flutter (Scaffold, Text, dll)
 
-import '../../../../core/theme/app_colors.dart'; // Palet warna aplikasi
+import '../../../../core/services/aksesibilitas_controller.dart'; // Pola getaran berhasil/gagal
+import '../../../../core/theme/theme_extensions.dart'; // Warna sadar-tema (terang/gelap/kontras tinggi)
 import '../../../../core/theme/app_typography.dart'; // Gaya teks terpusat
 import '../../data/transaction_model.dart'; // Model TransactionType
 import '../../data/transaksi_repository.dart'; // Sumber data kategori dari basis data
@@ -66,9 +67,11 @@ class _CategoryPickerPageState extends State<CategoryPickerPage> {
       // Kategori baru langsung jadi hasil pilihan — pengguna tidak
       // perlu menambah lalu mencarinya lagi di daftar sebagai dua
       // langkah terpisah.
+      AksesibilitasController.instance.getarBerhasil(); // Pola berhasil: 1 getaran pendek
       Navigator.pop(context, nama.trim()); // Tutup halaman ini, kembalikan nama kategori baru
     } catch (e) {
       if (!mounted) return; // Jangan pakai context bila widget sudah tidak ada
+      AksesibilitasController.instance.getarGagal(); // Pola gagal: 2 getaran pendek
       ScaffoldMessenger.of(context).showSnackBar( // Tampilkan pesan error singkat di bawah layar
         const SnackBar(
           content: Text('Kategori belum bisa disimpan. Coba lagi.'),
@@ -80,7 +83,7 @@ class _CategoryPickerPageState extends State<CategoryPickerPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold( // Kerangka halaman standar Flutter
-      backgroundColor: AppColors.bgPage, // Warna latar halaman
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor, // Warna latar mengikuti tema
       body: SafeArea( // Hindari area terhalang notch/status bar
         child: Column( // Susun elemen dari atas ke bawah
           crossAxisAlignment: CrossAxisAlignment.start, // Rata kiri
@@ -98,14 +101,19 @@ class _CategoryPickerPageState extends State<CategoryPickerPage> {
                     ),
                     onPressed: () => Navigator.pop(context), // Kembali ke halaman sebelumnya
                     tooltip: 'Kembali', // Teks bantuan aksesibilitas
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.chevron_left,
                       size: 30,
-                      color: AppColors.baseDark,
+                      color: context.warnaTeksUtama, // Ikon kembali mengikuti tema
                     ),
                   ),
                   const SizedBox(width: 4), // Jarak antar elemen
-                  Text('Pilih Kategori', style: AppTypography.titleLarge), // Judul halaman
+                  Text(
+                    'Pilih Kategori',
+                    style: AppTypography.titleLarge.copyWith(
+                      color: context.warnaTeksUtama, // Judul mengikuti tema
+                    ),
+                  ), // Judul halaman
                 ],
               ),
             ),
@@ -123,7 +131,7 @@ class _CategoryPickerPageState extends State<CategoryPickerPage> {
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
                     itemCount: daftar.length + 1, // +1 untuk baris "Tambah kategori baru"
                     separatorBuilder: (_, _) =>
-                        const Divider(height: 1, color: AppColors.divider), // Garis pemisah antar baris
+                        Divider(height: 1, color: context.warnaGaris), // Garis pemisah antar baris, ikut tema
                     itemBuilder: (context, index) {
                       // Baris pertama selalu "Tambah kategori baru",
                       // di posisi paling atas daftar.
@@ -173,6 +181,7 @@ class _BarisKategori extends StatelessWidget { // Satu baris kategori dalam daft
 
   @override
   Widget build(BuildContext context) {
+    final Color aksen = Theme.of(context).colorScheme.primary; // Warna aksen mengikuti tema (terang/gelap)
     // Status terpilih disampaikan lewat centang DAN bobot huruf tebal
     // sekaligus, bukan cuma warna — supaya tetap terbaca bagi
     // pengguna buta warna.
@@ -195,14 +204,14 @@ class _BarisKategori extends StatelessWidget { // Satu baris kategori dalam daft
                 Icon(
                   icon,
                   size: 20,
-                  color: isAksi ? AppColors.primary700 : AppColors.textMuted, // Warna beda untuk baris aksi
+                  color: isAksi ? aksen : context.warnaTeksMuted, // Warna beda untuk baris aksi
                 ),
                 const SizedBox(width: 14),
                 Expanded( // Teks label mengisi sisa ruang baris
                   child: Text(
                     label,
                     style: AppTypography.bodyLarge.copyWith(
-                      color: isAksi ? AppColors.primary700 : AppColors.baseDark,
+                      color: isAksi ? aksen : context.warnaTeksUtama,
                       fontWeight: isAksi || terpilih
                           ? FontWeight.w600 // Tebal untuk aksi atau kategori terpilih
                           : FontWeight.w400,
@@ -210,10 +219,10 @@ class _BarisKategori extends StatelessWidget { // Satu baris kategori dalam daft
                   ),
                 ),
                 if (terpilih) // Tampilkan centang hanya bila kategori ini aktif
-                  const Icon(
+                  Icon(
                     Icons.check,
                     size: 20,
-                    color: AppColors.primary700,
+                    color: aksen,
                   ),
               ],
             ),
@@ -244,38 +253,41 @@ class _DialogKategoriBaruState extends State<_DialogKategoriBaru> {
   Widget build(BuildContext context) {
     return AlertDialog( // Kotak dialog standar Flutter
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)), // Sudut membulat
-      title: const Text(
+      title: Text(
         'Kategori Baru',
         style: TextStyle(
           fontSize: 17,
           fontWeight: FontWeight.w700,
-          color: AppColors.baseDark,
+          color: context.warnaTeksUtama, // Judul mengikuti tema
         ),
       ),
       content: TextField( // Kolom input nama kategori
         controller: _ctrl,
         autofocus: true, // Langsung fokus & buka keyboard saat dialog muncul
         textCapitalization: TextCapitalization.sentences, // Huruf awal kalimat otomatis kapital
-        style: const TextStyle(fontSize: 16, color: AppColors.baseDark),
-        decoration: const InputDecoration(hintText: 'Nama kategori'), // Placeholder teks
+        style: TextStyle(fontSize: 16, color: context.warnaTeksUtama), // Teks ketikan mengikuti tema
+        decoration: InputDecoration(
+          hintText: 'Nama kategori', // Placeholder teks
+          hintStyle: TextStyle(color: context.warnaTeksMuted),
+        ),
         onSubmitted: (v) => Navigator.pop(context, v), // Tekan enter = langsung simpan
       ),
       actions: [
         TextButton(
           style: TextButton.styleFrom(minimumSize: const Size(88, 48)), // Ukuran minimum tombol
           onPressed: () => Navigator.pop(context), // Batal, tidak kembalikan nilai
-          child: const Text(
+          child: Text(
             'Batal',
-            style: TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w600),
+            style: TextStyle(color: context.warnaTeksMuted, fontWeight: FontWeight.w600),
           ),
         ),
         TextButton(
           style: TextButton.styleFrom(minimumSize: const Size(88, 48)),
           onPressed: () => Navigator.pop(context, _ctrl.text), // Simpan, kembalikan teks yang diketik
-          child: const Text(
+          child: Text(
             'Simpan',
             style: TextStyle(
-              color: AppColors.primary700,
+              color: Theme.of(context).colorScheme.primary, // Aksen mengikuti tema
               fontWeight: FontWeight.w700,
             ),
           ),

@@ -5,6 +5,9 @@ import 'core/services/keamanan_controller.dart'; // Pengelola pengaturan metode 
 import 'core/theme/app_theme.dart'; // Definisi tema terang/gelap aplikasi
 import 'core/theme/theme_controller.dart'; // Pengelola mode tema aktif
 import 'features/auth/presentation/pages/pin_lock_page.dart'; // Halaman kunci PIN saat aplikasi dibuka
+import 'features/onboarding/presentation/pages/registrasi_profil_page.dart'; // Registrasi langkah 1: profil
+import 'features/onboarding/presentation/pages/registrasi_tema_page.dart'; // Registrasi langkah 3: tema
+import 'features/onboarding/presentation/pages/splash_page.dart'; // Layar pembuka dengan logo
 import 'main_page.dart'; // Halaman utama aplikasi setelah berhasil masuk
 
 void main() async { // Titik masuk aplikasi Flutter
@@ -24,12 +27,31 @@ class MyApp extends StatefulWidget { // Widget akar aplikasi, punya state (statu
   State<MyApp> createState() => _MyAppState(); // Buat objek state untuk widget ini
 }
 
+/// Layar yang sedang tampil. Pengguna baru melewati alur registrasi:
+///   splash → profil → keamanan (pilih cara masuk + buat PIN) → tema → utama
+/// Pengguna lama:
+///   splash → kunci (PIN/sidik jari) → utama, atau langsung utama bila
+///   Kunci PIN dimatikan.
+enum _Layar { splash, profil, keamanan, tema, kunci, utama }
+
 class _MyAppState extends State<MyApp> { // Kelas state yang menyimpan data berubah-ubah
-  // KeamananController.instance.muat() sudah selesai di main() sebelum
-  // runApp dipanggil, jadi nilai pinAktif di sini sudah nilai tersimpan
-  // yang sebenarnya — bukan default sesaat. Kunci PIN nonaktif berarti
-  // langsung anggap "terbuka" sejak awal, lewati layar kunci sama sekali.
-  bool _terbuka = !KeamananController.instance.pinAktif.value; // Status apakah pengguna sudah berhasil melewati kunci PIN
+  _Layar _layar = _Layar.splash; // Selalu mulai dari layar pembuka
+
+  void _ke(_Layar l) => setState(() => _layar = l); // Pindah ke layar berikutnya
+
+  void _splashSelesai(bool sudahTerdaftar) {
+    if (!sudahTerdaftar) return _ke(_Layar.profil); // Pengguna baru: mulai registrasi
+    _ke(KeamananController.instance.pinAktif.value ? _Layar.kunci : _Layar.utama);
+  }
+
+  Widget _halaman() => switch (_layar) {
+        _Layar.splash => SplashPage(onSelesai: _splashSelesai),
+        _Layar.profil => RegistrasiProfilPage(onLanjut: () => _ke(_Layar.keamanan)),
+        _Layar.keamanan => PinLockPage(pendaftaran: true, onBerhasil: () => _ke(_Layar.tema)),
+        _Layar.tema => RegistrasiTemaPage(onSelesai: () => _ke(_Layar.utama)),
+        _Layar.kunci => PinLockPage(onBerhasil: () => _ke(_Layar.utama)),
+        _Layar.utama => const MainPage(),
+      };
 
   @override
   Widget build(BuildContext context) { // Membangun tampilan aplikasi
@@ -58,11 +80,10 @@ class _MyAppState extends State<MyApp> { // Kelas state yang menyimpan data beru
                   theme: AppTheme.lightTheme, // Tema untuk mode terang
                   darkTheme: AppTheme.darkTheme, // Tema untuk mode gelap
                   themeMode: mode, // Mode tema yang aktif saat ini
-                  home: _terbuka
-                      ? const MainPage() // Tampilkan halaman utama jika sudah terbuka
-                      : PinLockPage( // Tampilkan halaman kunci PIN jika belum terbuka
-                          onBerhasil: () => setState(() => _terbuka = true), // Tandai terbuka setelah PIN benar
-                        ),
+                  // KeyedSubtree: setiap layar dibangun baru saat berganti,
+                  // supaya PinLockPage registrasi dan PinLockPage masuk
+                  // tidak berbagi state.
+                  home: KeyedSubtree(key: ValueKey(_layar), child: _halaman()),
                 );
               },
             );

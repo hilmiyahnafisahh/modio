@@ -233,8 +233,10 @@ class _MainPageState extends State<MainPage> {
                                     )
                                   : const LinearGradient(
                                       colors: [
+                                        // Ujung terang primary500 hanya 2,5:1 terhadap ikon
+                                        // putih (gagal WCAG 1.4.11); primary900→700 ≥ 9:1.
+                                        AppColors.primary900,
                                         AppColors.primary700,
-                                        AppColors.primary500,
                                       ],
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,

@@ -26,7 +26,12 @@ class ChatBubble extends StatelessWidget { // Widget tampilan satu gelembung pes
   Widget build(BuildContext context) { // Membangun tampilan gelembung pesan
     final bool isUser = message.isUser; // Cek apakah pesan berasal dari pengguna
 
-    return Padding( // Beri jarak vertikal antar gelembung pesan
+    // Pengirim hanya dibedakan lewat posisi kiri/kanan dan warna, yang
+    // tidak terlihat oleh pembaca layar — sebutkan pengirimnya di label.
+    return Semantics( // Bungkus dengan info aksesibilitas untuk screen reader
+      label: '${isUser ? 'Anda' : 'Asisten AI'}: ${message.text}', // Sebut pengirim sebelum isi pesan
+      excludeSemantics: true, // Avatar dan teks anak tidak dibaca terpisah
+      child: Padding( // Beri jarak vertikal antar gelembung pesan
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row( // Susun avatar dan gelembung secara horizontal
         // Pesan user → kanan, pesan AI → kiri
@@ -94,6 +99,7 @@ class ChatBubble extends StatelessWidget { // Widget tampilan satu gelembung pes
           // Spasi di kanan untuk pesan AI
           if (!isUser) const SizedBox(width: 40), // Jarak kosong di kanan agar bubble AI tidak penuh selebar layar
         ],
+      ),
       ),
     );
   }

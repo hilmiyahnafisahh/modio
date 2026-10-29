@@ -32,6 +32,12 @@ class KeamananController { // Kelas pengatur metode masuk tambahan di layar kunc
   final ValueNotifier<bool> suaraAktif = ValueNotifier<bool>(true); // Status aktif/tidaknya fitur suara (PIN & catat transaksi)
   final ValueNotifier<bool> biometrikAktif = ValueNotifier<bool>(false); // Status aktif/tidaknya masuk lewat biometrik, default mati
 
+  /// Fitur sidik jari masih dalam pengembangan, jadi dimatikan sementara:
+  /// tombol Sidik Jari di layar kunci dan sakelar Autentikasi Biometrik
+  /// di Profil disembunyikan, apa pun nilai [biometrikAktif] yang
+  /// tersimpan. Ubah ke true begitu fiturnya siap dipakai.
+  static const bool biometrikTersedia = false;
+
   static const String _kPin = 'keamanan_pin_aktif'; // Kunci penyimpanan untuk opsi kunci PIN
   static const String _kSuara = 'keamanan_mode_suara'; // Kunci penyimpanan untuk opsi mode suara
   static const String _kBiometrik = 'keamanan_biometrik'; // Kunci penyimpanan untuk opsi biometrik
