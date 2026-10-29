@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart'; // Paket basis data SQLite
 
 import '../../../core/database/database_helper.dart'; // Akses koneksi basis data
+import '../../../core/services/ai_analysis_service.dart'; // Analisis laporan oleh AI lewat backend
 import '../../transactions/data/transaction_model.dart'; // Model TransactionItem & TransactionType
 import 'report_model.dart'; // Model LaporanBulanan & RincianKategori
 
@@ -12,6 +13,10 @@ import 'report_model.dart'; // Model LaporanBulanan & RincianKategori
 /// Seluruh angka dihitung dengan SQL. Tidak ada nilai yang dibangkitkan
 /// model bahasa — narasi hanya merangkai angka yang sudah dihitung.
 class LaporanRepository {
+  LaporanRepository({AiAnalysisService? ai}) : _ai = ai ?? AiAnalysisService(); // Bisa disuntik untuk pengujian, atau buat baru
+
+  final AiAnalysisService _ai; // Layanan analisis AI lewat backend
+
   Future<Database> get _db async => DatabaseHelper.instance.database; // Ambil koneksi basis data aktif
 
   /// Laporan satu bulan, lengkap dengan pembanding bulan sebelumnya.
@@ -174,6 +179,52 @@ class LaporanRepository {
       mulai.toUtc().toIso8601String(), // Konversi batas awal ke UTC untuk dibandingkan di SQL
       selesai.toUtc().toIso8601String(),
     );
+  }
+
+  /// Analisis laporan bulanan oleh Gemini AI: evaluasi laba rugi,
+  /// perencanaan ke depan, dan penilaian kondisi usaha.
+  ///
+  /// Gemini dipanggil lewat backend (AiAnalysisService), bukan langsung
+  /// dari app — kunci API di dalam APK bisa dibongkar siapa pun.
+  /// Angka dikirim sudah jadi; AI hanya menafsirkan, tidak menghitung.
+  Future<String> analisisLaporanDenganGemini({
+    required int tahun,
+    required int bulan,
+  }) async {
+    final LaporanBulanan laporan = await laporanBulan(tahun: tahun, bulan: bulan); // Ambil laporan dari basis data lokal
+
+    if (laporan.jumlahTransaksi == 0) { // Tidak ada data, tidak perlu memanggil AI
+      return 'Belum ada transaksi pada ${laporan.labelPeriode}, '
+          'jadi belum ada yang bisa dianalisis.';
+    }
+
+    List<Map<String, dynamic>> rincian(List<RincianKategori> daftar, int total) => // Ubah rincian kategori jadi data JSON
+        daftar
+            .map((r) => {
+                  'nama': r.nama,
+                  'total': r.total,
+                  'jumlah_transaksi': r.jumlahTransaksi,
+                  'persen': r.persen(total), // Porsi dihitung di app, bukan oleh AI
+                })
+            .toList();
+
+    try {
+      final String hasil = await _ai.analisisLaporan({ // Kirim ringkasan laporan ke backend
+        'periode': laporan.labelPeriode,
+        'total_pendapatan': laporan.totalPendapatan,
+        'total_beban': laporan.totalBeban,
+        'laba_bersih': laporan.labaBersih,
+        'jumlah_transaksi': laporan.jumlahTransaksi,
+        'perubahan_pendapatan': laporan.perubahanPendapatan,
+        'perubahan_beban': laporan.perubahanBeban,
+        'rincian_pendapatan': rincian(laporan.rincianPendapatan, laporan.totalPendapatan),
+        'rincian_beban': rincian(laporan.rincianBeban, laporan.totalBeban),
+      });
+      return hasil.isEmpty ? 'AI tidak memberikan hasil analisis. Coba lagi.' : hasil; // Jaga-jaga bila balasan kosong
+    } catch (_) { // Jika terjadi error apa pun (mis. tidak ada koneksi atau server mati)
+      return 'Analisis AI belum bisa dibuat. Pastikan HP tersambung ke '
+          'jaringan yang sama dengan server, lalu coba lagi.';
+    }
   }
 }
 

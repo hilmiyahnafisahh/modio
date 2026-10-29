@@ -287,6 +287,11 @@ class _ReportsPageState extends State<ReportsPage> { // kelas state untuk Report
         const SizedBox(height: 20), // jarak vertikal
 
         // ── Asisten Keuangan ─────────────────────────────────
+        _AsistenKeuanganSection( // bagian ajakan pakai asisten AI
+          tahun: _tahun,
+          bulan: _bulan,
+          repo: _repo,
+        ), 
         _AsistenKeuanganSection(laporan: l), // bagian ajakan pakai asisten AI
 
         PenandaAkhirHalaman( // dibacakan TalkBack setelah elemen terakhir
@@ -867,6 +872,15 @@ class _KategoriRincianTileState extends State<_KategoriRincianTile> {
 // Bagian Asisten Keuangan  –  pakai AiAssistantBanner yang sama dengan dashboard
 // ─────────────────────────────────────────────────────────────────────────────
 class _AsistenKeuanganSection extends StatelessWidget { // bagian ajakan pakai asisten AI
+  const _AsistenKeuanganSection({
+    required this.tahun,
+    required this.bulan,
+    required this.repo,
+  });
+
+  final int tahun;
+  final int bulan;
+  final LaporanRepository repo;
   const _AsistenKeuanganSection({required this.laporan});
 
   final LaporanBulanan laporan; // laporan bulan yang sedang dibuka, untuk dianalisis AI
@@ -874,11 +888,228 @@ class _AsistenKeuanganSection extends StatelessWidget { // bagian ajakan pakai a
   @override
   Widget build(BuildContext context) {
     return AiAssistantBanner( // banner ajakan analisis/chat dengan AI
+      onAnalysisTap: () async { 
+        // 1. Tampilkan dialog loading saat menyiapkan data laporan untuk AI
+        showDialog(
+          context: context,
+          barrierDismissible: false, // dialog tidak bisa ditutup dengan ketuk di luar
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(), // tampilkan indikator loading
+          ),
+        ); 
+        
+        // 2. Panggil fungsi analisis laba rugi dari repository
+        final String hasilAnalisis = await repo.analisisLaporanDenganGemini(
+          tahun: tahun,
+          bulan: bulan,
+        );
+
+        // 3. Tutup dialog loading
+        if (context.mounted) Navigator.pop(context);
+
+        // 4. Tampilkan hasil analisis dari Gemini dalam kotak dialog popup
+        if (context.mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text('Analisis Keuangan AI'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Text(
+                    hasilAnalisis,
+                    style: const TextStyle(fontSize: 14, height: 1.5),
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Tutup'),
+                ),
+              ],
+            ),
+          );
+        }
+      },
       onAnalysisTap: () => tampilkanAnalisisAi(context, laporan), // minta saran AI untuk bulan ini
       // Chat masih dummy, jadi tetap membuka halaman asisten.
       onChatTap: () => Navigator.push( // buka halaman asisten AI saat "Chat" ditekan
         context,
         buatRute((_) => const AiAssistantPage()),
+      ),
+    );
+  }
+}
+      
+// ─────────────────────────────────────────────────────────────────────────────
+// Dialog Pilih Bulan
+// ─────────────────────────────────────────────────────────────────────────────
+class _MonthPickerDialog extends StatefulWidget { // dialog pemilih bulan & tahun
+  final DateTime initialDate; // tanggal awal saat dialog dibuka
+  const _MonthPickerDialog({required this.initialDate});
+
+  @override
+  State<_MonthPickerDialog> createState() => _MonthPickerDialogState(); // buat state terkait
+}
+
+class _MonthPickerDialogState extends State<_MonthPickerDialog> {
+  late int _tahun; // tahun yang sedang dipilih di dialog
+  late int _bulan; // bulan yang sedang dipilih di dialog
+
+  static const List<String> _singkat = [ // nama bulan singkat untuk grid
+    'Jan', 'Feb', 'Mar', 'Apr',
+    'Mei', 'Jun', 'Jul', 'Agu',
+    'Sep', 'Okt', 'Nov', 'Des',
+  ];
+
+  static const List<String> _namaPanjang = [ // nama bulan lengkap untuk label semantik
+    'Januari', 'Februari', 'Maret', 'April',
+    'Mei', 'Juni', 'Juli', 'Agustus',
+    'September', 'Oktober', 'November', 'Desember',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _tahun = widget.initialDate.year; // set tahun awal dari parameter
+    _bulan = widget.initialDate.month; // set bulan awal dari parameter
+
+    // Dialog ini muncul di atas fokus TalkBack sebelumnya tanpa
+    // konteks apa pun — tanpa pengumuman ini, fokus otomatis jatuh ke
+    // tombol "Tahun sebelumnya" duluan dan pengguna tidak pernah
+    // diberi tahu bulan/tahun apa yang sedang ditampilkan.
+    // addPostFrameCallback dipakai karena View.of(context) baru valid
+    // setelah frame pertama dialog ini selesai dirender.
+    WidgetsBinding.instance.addPostFrameCallback((_) { // jalankan setelah frame pertama selesai dirender
+      if (!mounted) return; // batalkan jika widget sudah dilepas
+      SemanticsService.sendAnnouncement( // umumkan bulan/tahun aktif ke pembaca layar
+        View.of(context),
+        'Pilih bulan. Saat ini menampilkan ${_namaPanjang[_bulan - 1]} $_tahun.',
+        Directionality.of(context),
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final int tahunSekarang = DateTime.now().year; // tahun sekarang, batas atas navigasi tahun
+    return Dialog( // bungkus konten sebagai dialog modal
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), // sudut dialog membulat
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min, // tinggi seminimal isinya
+          children: [
+            // Navigator tahun
+            Row( // baris navigasi ganti tahun
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton( // tombol tahun sebelumnya
+                  icon: const Icon(Icons.chevron_left_rounded),
+                  onPressed: () => setState(() => _tahun--), // kurangi tahun
+                  tooltip: 'Tahun sebelumnya',
+                ),
+                Semantics(
+                  header: true, // tandai sebagai header bagi pembaca layar
+                  label: 'Tahun $_tahun',
+                  excludeSemantics: true,
+                  child: Text(
+                    '$_tahun', // tampilkan tahun aktif
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: context.warnaTeksUtama,
+                    ),
+                  ),
+                ),
+                IconButton( // tombol tahun berikutnya
+                  icon: const Icon(Icons.chevron_right_rounded),
+                  onPressed: _tahun < tahunSekarang // hanya aktif jika belum tahun sekarang
+                      ? () => setState(() => _tahun++) // tambah tahun
+                      : null,
+                  tooltip: 'Tahun berikutnya',
+                ),
+              ],
+            ),
+            const SizedBox(height: 12), // jarak vertikal
+
+            // Grid bulan
+            GridView.count( // grid 12 bulan
+              crossAxisCount: 4, // 4 kolom
+              shrinkWrap: true, // tinggi menyesuaikan isi
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 1.4, // rasio lebar:tinggi tiap sel
+              children: List.generate(12, (i) { // buat 12 tombol bulan
+                final int b = i + 1; // nomor bulan 1-12
+                final bool dipilih = b == _bulan; // apakah bulan ini sedang dipilih
+                return Semantics(
+                  button: true,
+                  selected: dipilih,
+                  label: '${_namaPanjang[i]}${dipilih ? ', dipilih' : ''}', // label sesuai status pilih
+                  onTap: () => setState(() => _bulan = b), // pilih bulan ini
+                  excludeSemantics: true,
+                  child: InkWell(
+                    onTap: () => setState(() => _bulan = b), // pilih bulan ini
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: dipilih // warna latar sesuai status pilih
+                            ? Theme.of(context).colorScheme.primary
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        _singkat[i], // teks nama bulan singkat
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: dipilih
+                              ? Theme.of(context).colorScheme.onPrimary
+                              : context.warnaTeksUtama,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 16), // jarak vertikal
+
+            // Tombol aksi
+            Row( // baris tombol Batal & Pilih
+              children: [
+                Expanded(
+                  child: TextButton( // tombol batal
+                    onPressed: () => Navigator.pop(context), // tutup dialog tanpa hasil
+                    child: Text(
+                      'Batal',
+                      style: TextStyle(color: context.warnaTeksMuted),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8), // jarak horizontal
+                Expanded(
+                  child: ElevatedButton( // tombol konfirmasi pilih
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: () => // kembalikan tanggal terpilih ke pemanggil
+                        Navigator.pop(context, DateTime(_tahun, _bulan)),
+                    child: const Text('Pilih'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
